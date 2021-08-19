@@ -1,4 +1,5 @@
 #include "DXCore.h"
+#include "Input.h"
 
 #include <WindowsX.h>
 #include <sstream>
@@ -72,6 +73,9 @@ DXCore::~DXCore()
 	// we don't need to explicitly clean up those DirectX objects
 	// - If we weren't using smart pointers, we'd need
 	//   to call Release() on each DirectX object created in DXCore
+
+	// Delete input manager singleton
+	delete& Input::GetInstance();
 }
 
 // --------------------------------------------------------
@@ -146,6 +150,9 @@ HRESULT DXCore::InitWindow()
 	// The window exists but is not visible yet
 	// We need to tell Windows to show it, and how to show it
 	ShowWindow(hWnd, SW_SHOW);
+
+	// Initialize the input manager now that we definitely have a window
+	Input::GetInstance().Initialize(hWnd);
 
 	// Return an "everything is ok" HRESULT value
 	return S_OK;
@@ -396,9 +403,15 @@ HRESULT DXCore::Run()
 			if(titleBarStats)
 				UpdateTitleBarStats();
 
+			// Update the input manager
+			Input::GetInstance().Update();
+
 			// The game loop
 			Update(deltaTime, totalTime);
 			Draw(deltaTime, totalTime);
+
+			// Frame is over, notify the input manager
+			Input::GetInstance().EndOfFrame();
 		}
 	}
 
@@ -532,7 +545,7 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 //
 // - As it turns out, the relative path for a program is different when 
 //    running through VS and when running the .exe directly, which makes 
-//    it a pain to properly load files external files (like textures)
+//    it a pain to properly load external files (like textures)
 //    - Running through VS: Current Dir is the *project folder*
 //    - Running from .exe:  Current Dir is the .exe's folder
 // - This has nothing to do with DEBUG and RELEASE modes - it's purely a 
@@ -540,7 +553,7 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 //    for it.  In fact, it could be fixed by changing a setting in VS, but
 //    the option is stored in a user file (.suo), which is ignored by most
 //    version control packages by default.  Meaning: the option must be
-//    changed every on every PC.  Ugh.  So instead, here's a helper.
+//    changed on every PC.  Ugh.  So instead, here's a helper.
 // --------------------------------------------------------------------------
 std::string DXCore::GetExePath()
 {
@@ -659,6 +672,11 @@ LRESULT DXCore::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		if (device) 
 			OnResize();
 
+		return 0;
+
+	// Has the mouse wheel been scrolled?
+	case WM_MOUSEWHEEL:
+		Input::GetInstance().SetWheelDelta(GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA);
 		return 0;
 	
 	// Is our focus state changing?

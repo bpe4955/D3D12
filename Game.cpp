@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "Vertex.h"
+#include "Input.h"
 
 // Needed for a helper function to read compiled shader files from the hard drive
 #pragma comment(lib, "d3dcompiler.lib")
@@ -236,8 +237,8 @@ void Game::OnResize()
 // --------------------------------------------------------
 void Game::Update(float deltaTime, float totalTime)
 {
-	// Quit if the escape key is pressed
-	if (GetAsyncKeyState(VK_ESCAPE))
+	// Example input checking: Quit if the escape key is pressed
+	if (Input::GetInstance().KeyDown(VK_ESCAPE))
 		Quit();
 }
 

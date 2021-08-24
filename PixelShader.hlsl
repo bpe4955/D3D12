@@ -11,8 +11,8 @@ struct VertexToPixel
 	//  |   Name          Semantic
 	//  |    |                |
 	//  v    v                v
-	float4 position		: SV_POSITION;
-	float4 color		: COLOR;
+	float4 screenPosition	: SV_POSITION;
+	float4 color			: COLOR;
 };
 
 // --------------------------------------------------------

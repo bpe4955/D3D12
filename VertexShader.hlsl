@@ -11,8 +11,8 @@ struct VertexShaderInput
 	//  |   Name          Semantic
 	//  |    |                |
 	//  v    v                v
-	float3 position		: POSITION;     // XYZ position
-	float4 color		: COLOR;        // RGBA color
+	float3 localPosition	: POSITION;     // XYZ position
+	float4 color			: COLOR;        // RGBA color
 };
 
 // Struct representing the data we're sending down the pipeline
@@ -27,8 +27,8 @@ struct VertexToPixel
 	//  |   Name          Semantic
 	//  |    |                |
 	//  v    v                v
-	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
-	float4 color		: COLOR;        // RGBA color
+	float4 screenPosition	: SV_POSITION;	// XYZW position (System Value Position)
+	float4 color			: COLOR;        // RGBA color
 };
 
 // --------------------------------------------------------
@@ -51,7 +51,7 @@ VertexToPixel main( VertexShaderInput input )
 	// - Each of these components is then automatically divided by the W component, 
 	//   which we're leaving at 1.0 for now (this is more useful when dealing with 
 	//   a perspective projection matrix, which we'll get to in the future).
-	output.position = float4(input.position, 1.0f);
+	output.screenPosition = float4(input.localPosition, 1.0f);
 
 	// Pass the color through 
 	// - The values will be interpolated per-pixel by the rasterizer

@@ -98,7 +98,9 @@ void Input::Update()
 	memcpy(prevKbState, kbState, sizeof(unsigned char) * 256);
 
 	// Get the latest keys (from Windows)
-	GetKeyboardState(kbState);
+	// Note the use of (void), which denotes to the compiler
+	// that we're intentionally ignoring the return value
+	(void)GetKeyboardState(kbState);
 
 	// Get the current mouse position then make it relative to the window
 	POINT mousePos = {};

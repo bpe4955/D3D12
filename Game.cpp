@@ -23,15 +23,14 @@ Game::Game(HINSTANCE hInstance)
 		"DirectX Game",	   // Text for the window's title bar
 		1280,			   // Width of the window's client area
 		720,			   // Height of the window's client area
-		true)			   // Show extra stats (fps) in title bar?
+		true),			   // Show extra stats (fps) in title bar?
+	vsync(false)
 {
-
 #if defined(DEBUG) || defined(_DEBUG)
 	// Do we want a console window?  Probably only in debug mode
 	CreateConsoleWindow(500, 120, 32, 120);
 	printf("Console window created successfully.  Feel free to printf() here.\n");
 #endif
-
 }
 
 // --------------------------------------------------------
@@ -304,7 +303,7 @@ void Game::Draw(float deltaTime, float totalTime)
 	// Present the back buffer to the user
 	//  - Puts the final frame we're drawing into the window so the user can see it
 	//  - Do this exactly ONCE PER FRAME (always at the very end of the frame)
-	swapChain->Present(0, 0);
+	swapChain->Present(vsync ? 1 : 0, 0);
 
 	// Due to the usage of a more sophisticated swap chain,
 	// the render target must be re-bound after every call to Present()

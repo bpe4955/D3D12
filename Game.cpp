@@ -189,7 +189,7 @@ void Game::CreateBasicGeometry()
 
 	// Create the proper struct to hold the initial vertex data
 	// - This is how we put the initial data into the buffer
-	D3D11_SUBRESOURCE_DATA initialVertexData;
+	D3D11_SUBRESOURCE_DATA initialVertexData = {};
 	initialVertexData.pSysMem = vertices;
 
 	// Actually create the buffer with the initial data
@@ -211,7 +211,7 @@ void Game::CreateBasicGeometry()
 
 	// Create the proper struct to hold the initial index data
 	// - This is how we put the initial data into the buffer
-	D3D11_SUBRESOURCE_DATA initialIndexData;
+	D3D11_SUBRESOURCE_DATA initialIndexData = {};
 	initialIndexData.pSysMem = indices;
 
 	// Actually create the buffer with the initial data

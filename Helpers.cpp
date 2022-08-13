@@ -72,6 +72,17 @@ std::wstring FixPath(const std::wstring& relativeFilePath)
 // ----------------------------------------------------
 std::string WideToNarrow(const std::wstring& str)
 {
-	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
 	return converter.to_bytes(str);
+}
+
+
+// ----------------------------------------------------
+//  Helper function for converting a standard ("narrow") 
+//  string to a wide character string
+// ----------------------------------------------------
+std::wstring NarrowToWide(const std::string& str)
+{
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	return converter.from_bytes(str);
 }

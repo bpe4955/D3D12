@@ -24,13 +24,13 @@ private:
 	// Should we use vsync to limit the frame rate?
 	bool vsync;
 
-	// Initialization helper methods - feel free to customize, combine, etc.
+	// Initialization helper methods - feel free to customize, combine, remove, etc.
 	void LoadShaders(); 
-	void CreateBasicGeometry();
+	void CreateGeometry();
 
 	// Note the usage of ComPtr below
 	//  - This is a smart pointer for objects that abide by the
-	//    Component Object Model, which DirectX objects do
+	//     Component Object Model, which DirectX objects do
 	//  - More info here: https://github.com/Microsoft/DirectXTK/wiki/ComPtr
 
 	// Buffers to hold actual geometry data

@@ -30,10 +30,26 @@ LRESULT DXCore::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 // --------------------------------------------------------
 DXCore::DXCore(
 	HINSTANCE hInstance,		// The application's handle
-	const char* titleBarText,	// Text for the window's title bar
+	const wchar_t* titleBarText,// Text for the window's title bar
 	unsigned int windowWidth,	// Width of the window's client area
 	unsigned int windowHeight,	// Height of the window's client area
-	bool debugTitleBarStats)	// Show extra stats (fps) in title bar?
+	bool debugTitleBarStats) 	// Show extra stats (fps) in title bar?
+	:
+	hInstance(hInstance),
+	titleBarText(titleBarText),
+	windowWidth(windowWidth),
+	windowHeight(windowHeight),
+	titleBarStats(debugTitleBarStats),
+	dxFeatureLevel(D3D_FEATURE_LEVEL_11_0),
+	fpsTimeElapsed(0),
+	fpsFrameCount(0),
+	previousTime(0),
+	currentTime(0),
+	deltaTime(0),
+	startTime(0),
+	totalTime(0),
+	hasFocus(true),
+	hWnd(0)
 {
 	// Save a static reference to this object.
 	//  - Since the OS-level message function must be a non-member (global) function, 
@@ -41,45 +57,28 @@ DXCore::DXCore(
 	//  - (Yes, a singleton might be a safer choice here).
 	DXCoreInstance = this;
 
-	// Save params
-	this->hInstance = hInstance;
-	this->titleBarText = titleBarText;
-	this->width = windowWidth;
-	this->height = windowHeight;
-	this->titleBarStats = debugTitleBarStats;
-
-	// Initialize fields
-	this->hasFocus = true; 
-	
-	this->fpsFrameCount = 0;
-	this->fpsTimeElapsed = 0.0f;
-	this->currentTime = 0;
-	this->deltaTime = 0;
-	this->startTime = 0;
-	this->totalTime = 0;
-
 	// Query performance counter for accurate timing information
-	__int64 perfFreq;
+	__int64 perfFreq = 0;
 	QueryPerformanceFrequency((LARGE_INTEGER*)&perfFreq);
 	perfCounterSeconds = 1.0 / (double)perfFreq;
 }
 
 // --------------------------------------------------------
-// Destructor - Clean up (release) all DirectX references
+// Destructor - Clean up (release) all Direct3D references
 // --------------------------------------------------------
 DXCore::~DXCore()
 {
-	// Note: Since we're using smart pointers (ComPtr),
-	// we don't need to explicitly clean up those DirectX objects
-	// - If we weren't using smart pointers, we'd need
-	//   to call Release() on each DirectX object created in DXCore
+	// Note: Since we're using ComPtrs for Direct3D resources,
+	//  we don't need to explicitly clean them up here
+	// - If we weren't using smart pointers, we'd need to call
+	//   Release() on each Direct3D object created in DXCore
 
 	// Delete input manager singleton
 	delete& Input::GetInstance();
 }
 
 // --------------------------------------------------------
-// Created the actual window for our application
+// Creates the actual window for our application
 // --------------------------------------------------------
 HRESULT DXCore::InitWindow()
 {
@@ -95,7 +94,7 @@ HRESULT DXCore::InitWindow()
 	wndClass.hCursor		= LoadCursor(NULL, IDC_ARROW);		// Default arrow cursor
 	wndClass.hbrBackground	= (HBRUSH)GetStockObject(BLACK_BRUSH);
 	wndClass.lpszMenuName	= NULL;
-	wndClass.lpszClassName	= "Direct3DWindowClass";
+	wndClass.lpszClassName	= L"Direct3DWindowClass";
 
 	// Attempt to register the window class we've defined
 	if (!RegisterClass(&wndClass))
@@ -112,7 +111,7 @@ HRESULT DXCore::InitWindow()
 	// Adjust the width and height so the "client size" matches
 	// the width and height given (the inner-area of the window)
 	RECT clientRect;
-	SetRect(&clientRect, 0, 0, width, height);
+	SetRect(&clientRect, 0, 0, windowWidth, windowHeight);
 	AdjustWindowRect(
 		&clientRect,
 		WS_OVERLAPPEDWINDOW,	// Has a title bar, border, min and max buttons, etc.
@@ -160,18 +159,18 @@ HRESULT DXCore::InitWindow()
 
 
 // --------------------------------------------------------
-// Initializes DirectX, which requires a window.  This method
-// also creates several DirectX objects we'll need to start
-// drawing things to the screen.
+// Initializes Direct3D, which requires a window.  This method
+// also creates several common Direct3D objects we'll need to 
+// start drawing things to the screen.
 // --------------------------------------------------------
-HRESULT DXCore::InitDirectX()
+HRESULT DXCore::InitDirect3D()
 {
-	// This will hold options for DirectX initialization
+	// This will hold options for Direct3D initialization
 	unsigned int deviceFlags = 0;
 
 #if defined(DEBUG) || defined(_DEBUG)
 	// If we're in debug mode in visual studio, we also
-	// want to make a "Debug DirectX Device" to see some
+	// want to make a "Debug Direct3D Device" to see some
 	// errors and warnings in Visual Studio's output window
 	// when things go wrong!
 	deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -181,8 +180,8 @@ HRESULT DXCore::InitDirectX()
 	// chain should work
 	DXGI_SWAP_CHAIN_DESC swapDesc = {};
 	swapDesc.BufferCount = 2;
-	swapDesc.BufferDesc.Width = width;
-	swapDesc.BufferDesc.Height = height;
+	swapDesc.BufferDesc.Width = windowWidth;
+	swapDesc.BufferDesc.Height = windowHeight;
 	swapDesc.BufferDesc.RefreshRate.Numerator = 60;
 	swapDesc.BufferDesc.RefreshRate.Denominator = 1;
 	swapDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -199,7 +198,7 @@ HRESULT DXCore::InitDirectX()
 	// Result variable for below function calls
 	HRESULT hr = S_OK;
 
-	// Attempt to initialize DirectX
+	// Attempt to initialize Direct3D
 	hr = D3D11CreateDeviceAndSwapChain(
 		0,							// Video adapter (physical GPU) to use, or null for default
 		D3D_DRIVER_TYPE_HARDWARE,	// We want to use the hardware (GPU)
@@ -237,8 +236,8 @@ HRESULT DXCore::InitDirectX()
 
 	// Set up the description of the texture to use for the depth buffer
 	D3D11_TEXTURE2D_DESC depthStencilDesc = {};
-	depthStencilDesc.Width				= width;
-	depthStencilDesc.Height				= height;
+	depthStencilDesc.Width				= windowWidth;
+	depthStencilDesc.Height				= windowHeight;
 	depthStencilDesc.MipLevels			= 1;
 	depthStencilDesc.ArraySize			= 1;
 	depthStencilDesc.Format				= DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -258,7 +257,7 @@ HRESULT DXCore::InitDirectX()
 		device->CreateDepthStencilView(
 			depthBufferTexture, 
 			0, 
-			depthStencilView.GetAddressOf());
+			depthBufferDSV.GetAddressOf());
 		depthBufferTexture->Release();
 	}
 
@@ -267,15 +266,15 @@ HRESULT DXCore::InitDirectX()
 	context->OMSetRenderTargets(
 		1, 
 		backBufferRTV.GetAddressOf(), 
-		depthStencilView.Get());
+		depthBufferDSV.Get());
 
 	// Lastly, set up a viewport so we render into
 	// to correct portion of the window
 	D3D11_VIEWPORT viewport = {};
 	viewport.TopLeftX	= 0;
 	viewport.TopLeftY	= 0;
-	viewport.Width		= (float)width;
-	viewport.Height		= (float)height;
+	viewport.Width		= (float)windowWidth;
+	viewport.Height		= (float)windowHeight;
 	viewport.MinDepth	= 0.0f;
 	viewport.MaxDepth	= 1.0f;
 	context->RSSetViewports(1, &viewport);
@@ -296,13 +295,13 @@ void DXCore::OnResize()
 {
 	// Release the buffers before resizing the swap chain
 	backBufferRTV.Reset();
-	depthStencilView.Reset();
+	depthBufferDSV.Reset();
 
 	// Resize the underlying swap chain buffers
 	swapChain->ResizeBuffers(
 		2,
-		width,
-		height,
+		windowWidth,
+		windowHeight,
 		DXGI_FORMAT_R8G8B8A8_UNORM,
 		0);
 
@@ -320,9 +319,9 @@ void DXCore::OnResize()
 	}
 
 	// Set up the description of the texture to use for the depth buffer
-	D3D11_TEXTURE2D_DESC depthStencilDesc;
-	depthStencilDesc.Width				= width;
-	depthStencilDesc.Height				= height;
+	D3D11_TEXTURE2D_DESC depthStencilDesc = {};
+	depthStencilDesc.Width				= windowWidth;
+	depthStencilDesc.Height				= windowHeight;
 	depthStencilDesc.MipLevels			= 1;
 	depthStencilDesc.ArraySize			= 1;
 	depthStencilDesc.Format				= DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -342,7 +341,7 @@ void DXCore::OnResize()
 		device->CreateDepthStencilView(
 			depthBufferTexture, 
 			0, 
-			depthStencilView.ReleaseAndGetAddressOf()); // ReleaseAndGetAddressOf() cleans up the old object before giving us the pointer
+			depthBufferDSV.ReleaseAndGetAddressOf()); // ReleaseAndGetAddressOf() cleans up the old object before giving us the pointer
 		depthBufferTexture->Release();
 	}
 
@@ -351,17 +350,17 @@ void DXCore::OnResize()
 	context->OMSetRenderTargets(
 		1, 
 		backBufferRTV.GetAddressOf(), // This requires a pointer to a pointer (an array of pointers), so we get the address of the pointer
-		depthStencilView.Get());
+		depthBufferDSV.Get());
 
 	// Lastly, set up a viewport so we render into
 	// to correct portion of the window
 	D3D11_VIEWPORT viewport = {};
-	viewport.TopLeftX = 0;
-	viewport.TopLeftY = 0;
-	viewport.Width = (float)width;
-	viewport.Height = (float)height;
-	viewport.MinDepth = 0.0f;
-	viewport.MaxDepth = 1.0f;
+	viewport.TopLeftX	= 0;
+	viewport.TopLeftY	= 0;
+	viewport.Width		= (float)windowWidth;
+	viewport.Height		= (float)windowHeight;
+	viewport.MinDepth	= 0.0f;
+	viewport.MaxDepth	= 1.0f;
 	context->RSSetViewports(1, &viewport);
 }
 
@@ -375,7 +374,7 @@ HRESULT DXCore::Run()
 {
 	// Grab the start time now that
 	// the game loop is running
-	__int64 now;
+	__int64 now = 0;
 	QueryPerformanceCounter((LARGE_INTEGER*)&now);
 	startTime = now;
 	currentTime = now;
@@ -438,7 +437,7 @@ void DXCore::Quit()
 void DXCore::UpdateTimer()
 {
 	// Grab the current time
-	__int64 now;
+	__int64 now = 0;
 	QueryPerformanceCounter((LARGE_INTEGER*)&now);
 	currentTime = now;
 
@@ -460,7 +459,7 @@ void DXCore::UpdateTimer()
 // per second, including:
 //  - The window's width & height
 //  - The current FPS and ms/frame
-//  - The version of DirectX actually being used (usually 11)
+//  - The version of Direct3D actually being used (usually 11)
 // --------------------------------------------------------
 void DXCore::UpdateTitleBarStats()
 {
@@ -475,25 +474,25 @@ void DXCore::UpdateTitleBarStats()
 	float mspf = 1000.0f / (float)fpsFrameCount;
 
 	// Quick and dirty title bar text (mostly for debugging)
-	std::ostringstream output;
+	std::wostringstream output;
 	output.precision(6);
 	output << titleBarText <<
-		"    Width: "		<< width <<
-		"    Height: "		<< height <<
+		"    Width: "		<< windowWidth <<
+		"    Height: "		<< windowHeight <<
 		"    FPS: "			<< fpsFrameCount <<
 		"    Frame Time: "	<< mspf << "ms";
 
-	// Append the version of DirectX the app is using
+	// Append the version of Direct3D the app is using
 	switch (dxFeatureLevel)
 	{
-	case D3D_FEATURE_LEVEL_11_1: output << "    DX 11.1"; break;
-	case D3D_FEATURE_LEVEL_11_0: output << "    DX 11.0"; break;
-	case D3D_FEATURE_LEVEL_10_1: output << "    DX 10.1"; break;
-	case D3D_FEATURE_LEVEL_10_0: output << "    DX 10.0"; break;
-	case D3D_FEATURE_LEVEL_9_3:  output << "    DX 9.3";  break;
-	case D3D_FEATURE_LEVEL_9_2:  output << "    DX 9.2";  break;
-	case D3D_FEATURE_LEVEL_9_1:  output << "    DX 9.1";  break;
-	default:                     output << "    DX ???";  break;
+	case D3D_FEATURE_LEVEL_11_1: output << "    D3D 11.1"; break;
+	case D3D_FEATURE_LEVEL_11_0: output << "    D3D 11.0"; break;
+	case D3D_FEATURE_LEVEL_10_1: output << "    D3D 10.1"; break;
+	case D3D_FEATURE_LEVEL_10_0: output << "    D3D 10.0"; break;
+	case D3D_FEATURE_LEVEL_9_3:  output << "    D3D 9.3";  break;
+	case D3D_FEATURE_LEVEL_9_2:  output << "    D3D 9.2";  break;
+	case D3D_FEATURE_LEVEL_9_1:  output << "    D3D 9.1";  break;
+	default:                     output << "    D3D ???";  break;
 	}
 
 	// Actually update the title bar and reset fps data
@@ -522,7 +521,7 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 	coninfo.dwSize.X = bufferColumns;
 	SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coninfo.dwSize);
 
-	SMALL_RECT rect;
+	SMALL_RECT rect = {};
 	rect.Left = 0;
 	rect.Top = 0;
 	rect.Right = windowColumns;
@@ -539,93 +538,6 @@ void DXCore::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 	HMENU hmenu = GetSystemMenu(consoleHandle, FALSE);
 	EnableMenuItem(hmenu, SC_CLOSE, MF_GRAYED);
 }
-
-// --------------------------------------------------------------------------
-// Gets the actual path to this executable
-//
-// - As it turns out, the relative path for a program is different when 
-//    running through VS and when running the .exe directly, which makes 
-//    it a pain to properly load external files (like textures)
-//    - Running through VS: Current Dir is the *project folder*
-//    - Running from .exe:  Current Dir is the .exe's folder
-// - This has nothing to do with DEBUG and RELEASE modes - it's purely a 
-//    Visual Studio "thing", and isn't obvious unless you know to look 
-//    for it.  In fact, it could be fixed by changing a setting in VS, but
-//    the option is stored in a user file (.suo), which is ignored by most
-//    version control packages by default.  Meaning: the option must be
-//    changed on every PC.  Ugh.  So instead, here's a helper.
-// --------------------------------------------------------------------------
-std::string DXCore::GetExePath()
-{
-	// Assume the path is just the "current directory" for now
-	std::string path = ".\\";
-
-	// Get the real, full path to this executable
-	char currentDir[1024] = {};
-	GetModuleFileName(0, currentDir, 1024);
-
-	// Find the location of the last slash charaacter
-	char* lastSlash = strrchr(currentDir, '\\');
-	if (lastSlash)
-	{
-		// End the string at the last slash character, essentially
-		// chopping off the exe's file name.  Remember, c-strings
-		// are null-terminated, so putting a "zero" character in 
-		// there simply denotes the end of the string.
-		*lastSlash = 0;
-		
-		// Set the remainder as the path
-		path = currentDir;
-	}
-
-	// Toss back whatever we've found
-	return path;
-}
-
-
-// ---------------------------------------------------
-//  Same as GetExePath(), except it returns a wide character
-//  string, which most of the Windows API requires.
-// ---------------------------------------------------
-std::wstring DXCore::GetExePath_Wide()
-{
-	// Grab the path as a standard string
-	std::string path = GetExePath();
-
-	// Convert to a wide string
-	wchar_t widePath[1024] = {};
-	mbstowcs_s(0, widePath, path.c_str(), 1024);
-
-	// Create a wstring for it and return
-	return std::wstring(widePath);
-}
-
-
-// ----------------------------------------------------
-//  Gets the full path to a given file.  NOTE: This does 
-//  NOT "find" the file, it simply concatenates the given
-//  relative file path onto the executable's path
-// ----------------------------------------------------
-std::string DXCore::GetFullPathTo(std::string relativeFilePath)
-{
-	return GetExePath() + "\\" + relativeFilePath;
-}
-
-
-
-// ----------------------------------------------------
-//  Same as GetFullPathTo, but with wide char strings.
-// 
-//  Gets the full path to a given file.  NOTE: This does 
-//  NOT "find" the file, it simply concatenates the given
-//  relative file path onto the executable's path
-// ----------------------------------------------------
-std::wstring DXCore::GetFullPathTo_Wide(std::wstring relativeFilePath)
-{
-	return GetExePath_Wide() + L"\\" + relativeFilePath;
-}
-
-
 
 
 
@@ -664,8 +576,8 @@ LRESULT DXCore::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 			return 0;
 		
 		// Save the new client area dimensions.
-		width = LOWORD(lParam);
-		height = HIWORD(lParam);
+		windowWidth = LOWORD(lParam);
+		windowHeight = HIWORD(lParam);
 
 		// If DX is initialized, resize 
 		// our required buffers

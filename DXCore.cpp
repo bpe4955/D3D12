@@ -94,7 +94,7 @@ HRESULT DXCore::InitWindow()
 	wndClass.hCursor		= LoadCursor(NULL, IDC_ARROW);		// Default arrow cursor
 	wndClass.hbrBackground	= (HBRUSH)GetStockObject(BLACK_BRUSH);
 	wndClass.lpszMenuName	= NULL;
-	wndClass.lpszClassName	= L"Direct3DWindowClass";
+	wndClass.lpszClassName	= L"Direct3DWindowClass"; // The "L" means this is a wide-character string
 
 	// Attempt to register the window class we've defined
 	if (!RegisterClass(&wndClass))
@@ -179,21 +179,21 @@ HRESULT DXCore::InitDirect3D()
 	// Create a description of how our swap
 	// chain should work
 	DXGI_SWAP_CHAIN_DESC swapDesc = {};
-	swapDesc.BufferCount = 2;
-	swapDesc.BufferDesc.Width = windowWidth;
-	swapDesc.BufferDesc.Height = windowHeight;
+	swapDesc.BufferCount		= 2;
+	swapDesc.BufferDesc.Width	= windowWidth;
+	swapDesc.BufferDesc.Height	= windowHeight;
 	swapDesc.BufferDesc.RefreshRate.Numerator = 60;
 	swapDesc.BufferDesc.RefreshRate.Denominator = 1;
-	swapDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapDesc.BufferDesc.Format	= DXGI_FORMAT_R8G8B8A8_UNORM;
 	swapDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 	swapDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-	swapDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapDesc.Flags = 0;
-	swapDesc.OutputWindow = hWnd;
-	swapDesc.SampleDesc.Count = 1;
+	swapDesc.BufferUsage		= DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	swapDesc.Flags				= 0;
+	swapDesc.OutputWindow		= hWnd;
+	swapDesc.SampleDesc.Count	= 1;
 	swapDesc.SampleDesc.Quality = 0;
-	swapDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapDesc.Windowed = true;
+	swapDesc.SwapEffect			= DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	swapDesc.Windowed			= true;
 
 	// Result variable for below function calls
 	HRESULT hr = S_OK;
@@ -214,55 +214,60 @@ HRESULT DXCore::InitDirect3D()
 		context.GetAddressOf());	// Pointer to our Device Context pointer
 	if (FAILED(hr)) return hr;
 
-	// The above function created the back buffer render target
-	// for us, but we need a reference to it
-	ID3D11Texture2D* backBufferTexture = 0;
-	swapChain->GetBuffer(
-		0,
-		__uuidof(ID3D11Texture2D),
-		(void**)&backBufferTexture);
-
-	// Now that we have the texture, create a render target view
-	// for the back buffer so we can render into it.  Then release
-	// our local reference to the texture, since we have the view.
-	if (backBufferTexture != 0)
+	// Create the Render Target View for the back buffer render target
 	{
-		device->CreateRenderTargetView(
-			backBufferTexture,
+		// The above function created the back buffer texture for us
+		// but we need to get a reference to it for the next step
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> backBufferTexture;
+		swapChain->GetBuffer(
 			0,
-			backBufferRTV.GetAddressOf());
-		backBufferTexture->Release();
+			__uuidof(ID3D11Texture2D),
+			(void**)backBufferTexture.GetAddressOf());
+
+		// Now that we have the texture ref, create a render target view
+		// for the back buffer so we can render into it.
+		if (backBufferTexture != 0)
+		{
+			device->CreateRenderTargetView(
+				backBufferTexture.Get(),
+				0,
+				backBufferRTV.GetAddressOf());
+		}
 	}
 
-	// Set up the description of the texture to use for the depth buffer
-	D3D11_TEXTURE2D_DESC depthStencilDesc = {};
-	depthStencilDesc.Width				= windowWidth;
-	depthStencilDesc.Height				= windowHeight;
-	depthStencilDesc.MipLevels			= 1;
-	depthStencilDesc.ArraySize			= 1;
-	depthStencilDesc.Format				= DXGI_FORMAT_D24_UNORM_S8_UINT;
-	depthStencilDesc.Usage				= D3D11_USAGE_DEFAULT;
-	depthStencilDesc.BindFlags			= D3D11_BIND_DEPTH_STENCIL;
-	depthStencilDesc.CPUAccessFlags		= 0;
-	depthStencilDesc.MiscFlags			= 0;
-	depthStencilDesc.SampleDesc.Count	= 1;
-	depthStencilDesc.SampleDesc.Quality = 0;
-
-	// Create the depth buffer and its view, then 
-	// release our reference to the texture
-	ID3D11Texture2D* depthBufferTexture = 0;
-	device->CreateTexture2D(&depthStencilDesc, 0, &depthBufferTexture);
-	if (depthBufferTexture != 0)
+	// Create the Depth Buffer and associated Depth Stencil View
 	{
-		device->CreateDepthStencilView(
-			depthBufferTexture, 
-			0, 
-			depthBufferDSV.GetAddressOf());
-		depthBufferTexture->Release();
+		// Set up the description of the texture to use for the depth buffer
+		D3D11_TEXTURE2D_DESC depthStencilDesc	= {};
+		depthStencilDesc.Width					= windowWidth;
+		depthStencilDesc.Height					= windowHeight;
+		depthStencilDesc.MipLevels				= 1;
+		depthStencilDesc.ArraySize				= 1;
+		depthStencilDesc.Format					= DXGI_FORMAT_D24_UNORM_S8_UINT;
+		depthStencilDesc.Usage					= D3D11_USAGE_DEFAULT;
+		depthStencilDesc.BindFlags				= D3D11_BIND_DEPTH_STENCIL;
+		depthStencilDesc.CPUAccessFlags			= 0;
+		depthStencilDesc.MiscFlags				= 0;
+		depthStencilDesc.SampleDesc.Count		= 1;
+		depthStencilDesc.SampleDesc.Quality		= 0;
+
+		// Create the depth buffer texture resource
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> depthBufferTexture;
+		device->CreateTexture2D(&depthStencilDesc, 0, depthBufferTexture.GetAddressOf());
+
+		// As long as the depth buffer texture was created successfully, 
+		// create the associated Depth Stencil View so we can use it for rendering
+		if (depthBufferTexture != 0)
+		{
+			device->CreateDepthStencilView(
+				depthBufferTexture.Get(),
+				0,
+				depthBufferDSV.GetAddressOf());
+		}
 	}
 
-	// Bind the views to the pipeline, so rendering properly 
-	// uses their underlying textures
+	// Bind the back buffer and depth buffer to the pipeline
+	// so these particular resources are used when rendering
 	context->OMSetRenderTargets(
 		1, 
 		backBufferRTV.GetAddressOf(), 

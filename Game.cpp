@@ -24,8 +24,8 @@ Game::Game(HINSTANCE hInstance)
 		L"DirectX Game",	// Text for the window's title bar (as a wide-character string)
 		1280,				// Width of the window's client area
 		720,				// Height of the window's client area
-		true),				// Show extra stats (fps) in title bar?
-	vsync(false)
+		false,				// Sync the framerate to the monitor refresh? (lock framerate)
+		true)				// Show extra stats (fps) in title bar?
 {
 #if defined(DEBUG) || defined(_DEBUG)
 	// Do we want a console window?  Probably only in debug mode

@@ -21,9 +21,6 @@ public:
 
 private:
 
-	// Should we use vsync to limit the frame rate?
-	bool vsync;
-
 	// Initialization helper methods - feel free to customize, combine, remove, etc.
 	void LoadShaders(); 
 	void CreateGeometry();

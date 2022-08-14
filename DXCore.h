@@ -17,6 +17,7 @@ public:
 		const wchar_t* titleBarText,// Text for the window's title bar
 		unsigned int windowWidth,	// Width of the window's client area
 		unsigned int windowHeight,	// Height of the window's client area
+		bool vsync,					// Sync the framerate to the monitor?
 		bool debugTitleBarStats);	// Show extra stats (fps) in title bar?
 	~DXCore();
 
@@ -57,6 +58,10 @@ protected:
 	// Does our window currently have focus?
 	// Helpful if we want to pause while not the active window
 	bool hasFocus;
+
+	// Should our framerate sync to the vertical refresh
+	// of the monitor (true) or run as fast as possible (false)?
+	bool vsync;
 
 	// DirectX related objects and variables
 	D3D_FEATURE_LEVEL		dxFeatureLevel;

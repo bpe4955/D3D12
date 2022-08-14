@@ -33,22 +33,24 @@ DXCore::DXCore(
 	const wchar_t* titleBarText,// Text for the window's title bar
 	unsigned int windowWidth,	// Width of the window's client area
 	unsigned int windowHeight,	// Height of the window's client area
+	bool vsync,					// Sync the framerate to the monitor?
 	bool debugTitleBarStats) 	// Show extra stats (fps) in title bar?
 	:
 	hInstance(hInstance),
 	titleBarText(titleBarText),
 	windowWidth(windowWidth),
 	windowHeight(windowHeight),
+	vsync(vsync),
 	titleBarStats(debugTitleBarStats),
 	dxFeatureLevel(D3D_FEATURE_LEVEL_11_0),
 	fpsTimeElapsed(0),
 	fpsFrameCount(0),
 	previousTime(0),
 	currentTime(0),
+	hasFocus(true),
 	deltaTime(0),
 	startTime(0),
 	totalTime(0),
-	hasFocus(true),
 	hWnd(0)
 {
 	// Save a static reference to this object.

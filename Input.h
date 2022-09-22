@@ -83,8 +83,8 @@ private:
 	float wheelDelta {0};
 
 	// Support for capturing input outside the input manager
-	bool keyboardCaptured;
-	bool mouseCaptured;
+	bool keyboardCaptured {0};
+	bool mouseCaptured {0};
 
 	// The window's handle (id) from the OS, so
 	// we can get the cursor's position

@@ -42,6 +42,7 @@ DXCore::DXCore(
 	windowWidth(windowWidth),
 	windowHeight(windowHeight),
 	vsync(vsync),
+	isFullscreen(false),
 	deviceSupportsTearing(false),
 	titleBarStats(debugTitleBarStats),
 	dxFeatureLevel(D3D_FEATURE_LEVEL_11_0),
@@ -181,14 +182,14 @@ HRESULT DXCore::InitDirect3D()
 #endif
 
 	// Determine if screen tearing ("vsync off") is available
-	// - It almost always is, though some laptops may not support it
+	// - This is necessary due to variable refresh rate displays
 	Microsoft::WRL::ComPtr<IDXGIFactory5> factory;
 	if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
 	{
-		// Check for this specific feature
-		bool tearingSupported = false;
+		// Check for this specific feature (must use BOOL typedef here!)
+		BOOL tearingSupported = false;
 		HRESULT featureCheck = factory->CheckFeatureSupport(
-			DXGI_FEATURE_PRESENT_ALLOW_TEARING, 
+			DXGI_FEATURE_PRESENT_ALLOW_TEARING,
 			&tearingSupported,
 			sizeof(tearingSupported));
 
@@ -385,6 +386,9 @@ void DXCore::OnResize()
 	viewport.MinDepth	= 0.0f;
 	viewport.MaxDepth	= 1.0f;
 	context->RSSetViewports(1, &viewport);
+
+	// Are we in a fullscreen state?
+ 	swapChain->GetFullscreenState(&isFullscreen, 0);
 }
 
 

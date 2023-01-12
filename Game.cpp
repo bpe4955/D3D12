@@ -320,7 +320,9 @@ void Game::Draw(float deltaTime, float totalTime)
 		// Present the back buffer to the user
 		//  - Puts the results of what we've drawn onto the window
 		//  - Without this, the user never sees anything
-		swapChain->Present(vsync ? 1 : 0, 0);
+		swapChain->Present(
+			vsync ? 1 : 0, 
+			(vsync || !deviceSupportsTearing) ? 0 : DXGI_PRESENT_ALLOW_TEARING);
 
 		// Must re-bind buffers after presenting, as they become unbound
 		context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());

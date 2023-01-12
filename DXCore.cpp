@@ -1,6 +1,7 @@
 #include "DXCore.h"
 #include "Input.h"
 
+#include <dxgi1_5.h>
 #include <WindowsX.h>
 #include <sstream>
 
@@ -41,6 +42,7 @@ DXCore::DXCore(
 	windowWidth(windowWidth),
 	windowHeight(windowHeight),
 	vsync(vsync),
+	deviceSupportsTearing(false),
 	titleBarStats(debugTitleBarStats),
 	dxFeatureLevel(D3D_FEATURE_LEVEL_11_0),
 	fpsTimeElapsed(0),
@@ -178,6 +180,22 @@ HRESULT DXCore::InitDirect3D()
 	deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
+	// Determine if screen tearing ("vsync off") is available
+	// - It almost always is, though some laptops may not support it
+	Microsoft::WRL::ComPtr<IDXGIFactory5> factory;
+	if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+	{
+		// Check for this specific feature
+		bool tearingSupported = false;
+		HRESULT featureCheck = factory->CheckFeatureSupport(
+			DXGI_FEATURE_PRESENT_ALLOW_TEARING, 
+			&tearingSupported,
+			sizeof(tearingSupported));
+
+		// Final determination of support
+		deviceSupportsTearing = SUCCEEDED(featureCheck) && tearingSupported;
+	}
+
 	// Create a description of how our swap
 	// chain should work
 	DXGI_SWAP_CHAIN_DESC swapDesc = {};
@@ -190,7 +208,7 @@ HRESULT DXCore::InitDirect3D()
 	swapDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 	swapDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 	swapDesc.BufferUsage		= DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapDesc.Flags				= 0;
+	swapDesc.Flags				= deviceSupportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 	swapDesc.OutputWindow		= hWnd;
 	swapDesc.SampleDesc.Count	= 1;
 	swapDesc.SampleDesc.Quality = 0;
@@ -309,7 +327,7 @@ void DXCore::OnResize()
 			windowWidth,
 			windowHeight,
 			DXGI_FORMAT_R8G8B8A8_UNORM,
-			0);
+			deviceSupportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
 	}
 
 	// A new back buffer requires a new Render Target View

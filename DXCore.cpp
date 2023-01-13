@@ -376,7 +376,7 @@ void DXCore::OnResize()
 	// so these particular resources are used when rendering
 	context->OMSetRenderTargets(1, backBufferRTV.GetAddressOf(), depthBufferDSV.Get());
 
-	// Lastly, set up a viewport so we render into
+	// Set up a viewport so we render into
 	// to correct portion of the window
 	D3D11_VIEWPORT viewport = {};
 	viewport.TopLeftX	= 0;

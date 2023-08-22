@@ -508,7 +508,7 @@ void DXCore::UpdateTitleBarStats()
 		"    Height: "		<< windowHeight <<
 		"    FPS: "			<< fpsFrameCount <<
 		"    Frame Time: "	<< mspf << "ms";
-
+	
 	// Append the version of Direct3D the app is using
 	switch (dxFeatureLevel)
 	{
@@ -630,6 +630,6 @@ LRESULT DXCore::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 
 	// Let Windows handle any messages we're not touching
-	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	return DefWindowProcA(hWnd, uMsg, wParam, lParam);
 }
 

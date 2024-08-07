@@ -1,2 +1,2 @@
-# DX11Starter
-Starter code for a DX11 project
+# D3D1Starter
+Starter code for a D3D11-based project

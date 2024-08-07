@@ -1,28 +1,27 @@
 #pragma once
 
-#include "DXCore.h"
-#include <DirectXMath.h>
-#include <wrl/client.h> // Used for ComPtr - a smart pointer for COM objects
+#include <d3d11.h>
+#include <wrl/client.h>
 
-class Game 
-	: public DXCore
+class Game
 {
-
 public:
-	Game(HINSTANCE hInstance);
+	// Basic OOP setup
+	Game() = default;
 	~Game();
+	Game(const Game&) = delete; // Remove copy constructor
+	Game& operator=(const Game&) = delete; // Remove copy-assignment operator
 
-	// Overridden setup and game loop methods, which
-	// will be called automatically
-	void Init();
-	void OnResize();
+	// Primary functions
+	void Initialize();
 	void Update(float deltaTime, float totalTime);
 	void Draw(float deltaTime, float totalTime);
+	void OnResize();
 
 private:
 
 	// Initialization helper methods - feel free to customize, combine, remove, etc.
-	void LoadShaders(); 
+	void LoadShaders();
 	void CreateGeometry();
 
 	// Note the usage of ComPtr below
@@ -33,11 +32,10 @@ private:
 	// Buffers to hold actual geometry data
 	Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;
-	
+
 	// Shaders and shader-related constructs
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout;
-
 };
 

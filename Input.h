@@ -2,34 +2,12 @@
 
 #include <Windows.h>
 
-class Input
+// See Input.cpp for usage details
+
+namespace Input
 {
-#pragma region Singleton
-public:
-	// Gets the one and only instance of this class
-	static Input& GetInstance()
-	{
-		if (!instance)
-		{
-			instance = new Input();
-		}
-
-		return *instance;
-	}
-
-	// Remove these functions (C++ 11 version)
-	Input(Input const&) = delete;
-	void operator=(Input const&) = delete;
-
-private:
-	static Input* instance;
-	Input() {};
-#pragma endregion
-
-public:
-	~Input();
-
 	void Initialize(HWND windowHandle);
+	void ShutDown();
 	void Update();
 	void EndOfFrame();
 
@@ -72,29 +50,4 @@ public:
 
 	bool MouseMiddlePress();
 	bool MouseMiddleRelease();
-
-private:
-	// Arrays for the current and previous key states
-	unsigned char* kbState {0};
-	unsigned char* prevKbState {0};
-
-	// Mouse position and wheel data
-	int mouseX {0};
-	int mouseY {0};
-	int prevMouseX {0};
-	int prevMouseY {0};
-	int mouseXDelta {0};
-	int mouseYDelta {0};
-	int rawMouseXDelta{ 0 };
-	int rawMouseYDelta{ 0 };
-	float wheelDelta {0};
-
-	// Support for capturing input outside the input manager
-	bool keyboardCaptured {0};
-	bool mouseCaptured {0};
-
-	// The window's handle (id) from the OS, so
-	// we can get the cursor's position
-	HWND windowHandle {0};
-};
-
+}

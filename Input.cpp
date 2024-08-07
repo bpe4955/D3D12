@@ -1,27 +1,15 @@
 #include "Input.h"
 #include <hidusage.h>
 
-// Singleton requirement
-Input* Input::instance;
-
 // --------------- Basic usage -----------------
 // 
-// This class is set up as a singleton, meaning there
-// is only ever one instance of the class.  You can
-// access that instance through the static GetInstance()
-// function, like so:
+// All input-related functions are part of the
+// "Input" namespace, and can be accessed like so:
 // 
-//   Input::GetInstance().SomeFunctionHere()
-// 
-// To make your code less verbose, I suggest storing
-// a reference to this instance in a temporary variable
-// if you plan on call multiple functions in a row:
-// 
-//   Input& input = Input::GetInstance();
-//   if (input.KeyDown('W')) { }
-//   if (input.KeyDown('A')) { }
-//   if (input.KeyDown('S')) { }
-//   if (input.KeyDown('D')) { }
+//   if (Input::KeyDown('W')) { }
+//   if (Input::KeyDown('A')) { }
+//   if (Input::KeyDown('S')) { }
+//   if (Input::KeyDown('D')) { }
 // 
 // 
 // The keyboard functions all take a single character
@@ -35,18 +23,16 @@ Input* Input::instance;
 // 
 // Checking if various keys are down or up:
 // 
-//   Input& input = Input::GetInstance();
-//   if (input.KeyDown('W')) { }
-//   if (input.KeyUp('2')) { }
-//   if (input.KeyDown(VK_SHIFT)) { }
+//   if (Input::KeyDown('W')) { }
+//   if (Input::KeyUp('2')) { }
+//   if (Input::KeyDown(VK_SHIFT)) { }
 //
 // 
 // Checking if a key was initially pressed or released 
 // this frame:  
 // 
-//   Input& input = Input::GetInstance();
-//   if (input.KeyPressed('Q')) { }
-//   if (input.KeyReleased(' ')) { }
+//   if (Input::KeyPressed('Q')) { }
+//   if (Input::KeyReleased(' ')) { }
 // 
 // (Note that these functions will only return true on 
 // the FIRST frame that a key is pressed or released.)
@@ -54,12 +40,11 @@ Input* Input::instance;
 // 
 // Checking for mouse button input is similar:
 // 
-//   Input& input = Input::GetInstance();
-//   if (input.MouseLeftDown()) { }
-//   if (input.MouseRightDown()) { }
-//   if (input.MouseMiddleUp()) { }
-//   if (input.MouseLeftPressed()) { }
-//   if (input.MouseRightReleased()) { }
+//   if (Input::MouseLeftDown()) { }
+//   if (Input::MouseRightDown()) { }
+//   if (Input::MouseMiddleUp()) { }
+//   if (Input::MouseLeftPressed()) { }
+//   if (Input::MouseRightReleased()) { }
 //
 // 
 // To handle relative mouse movement, you can use either
@@ -71,31 +56,50 @@ Input* Input::instance;
 //    functions if you expect the same pointer behavior
 //    as your mouse cursor in Windows.
 // 
-//       Input& input = Input::GetInstance();
-//       int xDelta = input.GetMouseXDelta();
-//       int yDelta = input.GetMouseYDelta();
+//       int xDelta = Input::GetMouseXDelta();
+//       int yDelta = Input::GetMouseYDelta();
 // 
 //  - *Raw* input is read directly from the device, and is
 //    a measure of how far the *mouse* moved, not the *cursor*.
 //    Use these functions if you want high-precision movements
 //    independent of the operating system or screen pixels.
 // 
-//       Input& input = Input::GetInstance();
-//       int xRawDelta = input.GetRawMouseXDelta();
-//       int yRawDelta = input.GetRawMouseYDelta();
-//                                ^^^
+//       int xRawDelta = Input::GetRawMouseXDelta();
+//       int yRawDelta = Input::GetRawMouseYDelta();
+//                                 ^^^
 //  
 // ---------------------------------------------
 
-
-// --------------------------
-//  Cleans up the key arrays
-// --------------------------
-Input::~Input()
+namespace Input
 {
-	delete[] kbState;
-	delete[] prevKbState;
+	// Annonymous namespace to hold variables only accessible in this file
+	namespace 
+	{
+		// Arrays for the current and previous key states
+		unsigned char* kbState = 0;
+		unsigned char* prevKbState = 0;
+
+		// Mouse position and wheel data
+		int mouseX = 0;
+		int mouseY = 0;
+		int prevMouseX = 0;
+		int prevMouseY = 0;
+		int mouseXDelta = 0;
+		int mouseYDelta = 0;
+		int rawMouseXDelta = 0;
+		int rawMouseYDelta = 0;
+		float wheelDelta = 0;
+
+		// Support for capturing input outside the input manager
+		bool keyboardCaptured = false;
+		bool mouseCaptured = false;
+
+		// The window's handle (id) from the OS, so
+		// we can get the cursor's position
+		HWND hWnd = 0;
+	}
 }
+
 
 // ---------------------------------------------------
 //  Initializes the input variables and sets up the
@@ -118,7 +122,7 @@ void Input::Initialize(HWND windowHandle)
 	mouseXDelta = 0; mouseYDelta = 0;
 	keyboardCaptured = false; mouseCaptured = false;
 
-	this->windowHandle = windowHandle;
+	hWnd = windowHandle;
 
 	// Register for raw input from the mouse
 	RAWINPUTDEVICE mouse = {};
@@ -127,6 +131,16 @@ void Input::Initialize(HWND windowHandle)
 	mouse.dwFlags = RIDEV_INPUTSINK;
 	mouse.hwndTarget = windowHandle;
 	RegisterRawInputDevices(&mouse, 1, sizeof(mouse));
+}
+
+// ---------------------------------------------------
+//  Shuts down the input system, freeing any
+//  allocated memory
+// ---------------------------------------------------
+void Input::ShutDown()
+{
+	delete[] kbState;
+	delete[] prevKbState;
 }
 
 // ----------------------------------------------------------
@@ -147,7 +161,7 @@ void Input::Update()
 	// Get the current mouse position then make it relative to the window
 	POINT mousePos = {};
 	GetCursorPos(&mousePos);
-	ScreenToClient(windowHandle, &mousePos);
+	ScreenToClient(hWnd, &mousePos);
 
 	// Save the previous mouse position, then the current mouse 
 	// position and finally calculate the change from the previous frame

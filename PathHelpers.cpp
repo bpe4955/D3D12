@@ -6,7 +6,7 @@
 #include "PathHelpers.h"
 
 // --------------------------------------------------------------------------
-// Gets the actual path to this executable as a wide character string (wstring)
+// Gets the actual path to this executable
 //
 // - As it turns out, the relative path for a program is different when 
 //    running through VS and when running the .exe directly, which makes 
@@ -84,8 +84,10 @@ std::wstring FixPath(const std::wstring& relativeFilePath)
 // ----------------------------------------------------
 std::string WideToNarrow(const std::wstring& str)
 {
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-	return converter.to_bytes(str);
+	int size = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), (int)str.length(), 0, 0, 0, 0);
+	std::string result(size, 0);
+	WideCharToMultiByte(CP_UTF8, 0, str.c_str(), -1, &result[0], size, 0, 0);
+	return result;
 }
 
 
@@ -95,6 +97,8 @@ std::string WideToNarrow(const std::wstring& str)
 // ----------------------------------------------------
 std::wstring NarrowToWide(const std::string& str)
 {
-	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-	return converter.from_bytes(str);
+	int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.length(), 0, 0);
+	std::wstring result(size, 0);
+	MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &result[0], size);
+	return result;
 }

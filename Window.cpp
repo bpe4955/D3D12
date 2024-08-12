@@ -236,6 +236,12 @@ void Window::CreateConsoleWindow(int bufferLines, int bufferColumns, int windowL
 	HMENU hmenu = GetSystemMenu(consoleHandle, FALSE);
 	EnableMenuItem(hmenu, SC_CLOSE, MF_GRAYED);
 
+	// Get the current console mode and append options that allow colored output
+	DWORD currentMode = 0;
+	GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &currentMode);
+	SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), 
+		currentMode | ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+
 	consoleCreated = true;
 }
 

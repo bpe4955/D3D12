@@ -72,7 +72,6 @@ HRESULT Window::Create(
 	windowTitle = titleBarText;
 	windowStats = statsInTitleBar;
 	onResize = resizeCallback;
-	//game = gameApp;
 
 	// Start window creation by filling out the
 	// appropriate window class struct

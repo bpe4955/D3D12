@@ -24,9 +24,9 @@ namespace Window
 		bool hasFocus = false;
 		bool isMinimized = false;
 		
-		// Game class pointer necessary
-		// for window resizing callback
-		Game* game;
+		// Function pointer to call
+		// when the window resizes
+		void (*onResize)() = 0;
 
 		// Basic FPS tracking
 		float fpsTimeElapsed = 0.0f;
@@ -52,7 +52,7 @@ bool Window::IsMinimized() { return isMinimized; }
 // height          - Desired height of the window
 // titleBarText    - Window's title bar text
 // statsInTitleBar - Want debug stats (like FPS) in title bar?
-// gameApp         - The Game object associated with this window
+// resizeCallback  - The function to call when the window resizes
 // --------------------------------------------------------
 HRESULT Window::Create(
 	HINSTANCE appInstance,
@@ -60,7 +60,7 @@ HRESULT Window::Create(
 	unsigned int height, 
 	std::wstring titleBarText,
 	bool statsInTitleBar,
-	Game* gameApp)
+	void (*resizeCallback)())
 {
 	// Verify
 	if (windowCreated)
@@ -71,7 +71,8 @@ HRESULT Window::Create(
 	windowHeight = height;
 	windowTitle = titleBarText;
 	windowStats = statsInTitleBar;
-	game = gameApp;
+	onResize = resizeCallback;
+	//game = gameApp;
 
 	// Start window creation by filling out the
 	// appropriate window class struct
@@ -286,7 +287,8 @@ LRESULT Window::ProcessMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 		// Let other systems know
 		Graphics::ResizeBuffers(windowWidth, windowHeight);
-		game->OnResize();
+		if(onResize)
+			onResize();
 
 		return 0;
 

@@ -7,6 +7,30 @@
 #include "Game.h"
 #include "Input.h"
 
+// Annonymous namespace to hold variables
+// only accessible in this file
+namespace
+{
+	// A "global" game object that
+	// can be used in WinMain() and
+	// in our window resize callback
+	Game* game = 0;
+
+	// A simple function to hook up 
+	// to the window for resize
+	// notifications
+	void WindowResizeCallback()
+	{
+		// Let the game object know
+		// that the window has been
+		// resized, if it exists
+		if(game)
+			game->OnResize();
+	}
+}
+
+
+
 // --------------------------------------------------------
 // Entry point for a graphical (non-console) Windows application
 // --------------------------------------------------------
@@ -34,16 +58,16 @@ int WINAPI WinMain(
 	bool vsync = false;
 
 	// The main application object
-	Game* game = new Game();
+	game = new Game();
 
 	// Create the window and verify
 	HRESULT windowResult = Window::Create(
-		hInstance, 
-		windowWidth, 
-		windowHeight, 
-		windowTitle, 
-		statsInTitleBar, 
-		game);
+		hInstance,
+		windowWidth,
+		windowHeight,
+		windowTitle,
+		statsInTitleBar,
+		WindowResizeCallback);
 	if (FAILED(windowResult))
 		return windowResult;
 

@@ -3,8 +3,6 @@
 #include <Windows.h>
 #include <string>
 
-#include "Game.h"
-
 namespace Window
 {
 	// Getters
@@ -18,11 +16,11 @@ namespace Window
 	// Window-related functions
 	HRESULT Create(
 		HINSTANCE appInstance,
-		unsigned int width, 
+		unsigned int width,
 		unsigned int height,
 		std::wstring titleBarText,
 		bool statsInTitleBar,
-		Game* game);
+		void (*resizeCallback)());
 	void UpdateStats(float totalTime);
 	void Quit();
 

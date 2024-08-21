@@ -21,9 +21,6 @@ namespace Graphics
 	inline Microsoft::WRL::ComPtr<ID3D11RenderTargetView> BackBufferRTV;
 	inline Microsoft::WRL::ComPtr<ID3D11DepthStencilView> DepthBufferDSV;
 
-	// Debug Layer
-	inline Microsoft::WRL::ComPtr<ID3D11InfoQueue> InfoQueue;
-
 	// --- FUNCTIONS ---
 
 	// Getters

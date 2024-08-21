@@ -20,6 +20,8 @@ namespace Graphics
 		BOOL isFullscreen = false;
 
 		D3D_FEATURE_LEVEL featureLevel;
+
+		Microsoft::WRL::ComPtr<ID3D11InfoQueue> InfoQueue;
 	}
 }
 

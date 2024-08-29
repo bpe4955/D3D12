@@ -1,25 +1,34 @@
 #pragma once
 
 #include <Windows.h>
-#include <d3d11.h>
+#include <d3d12.h>
+#include <dxgi1_6.h>
 #include <string>
 #include <wrl/client.h>
 
-#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 
 namespace Graphics
 {
 	// --- GLOBAL VARS ---
 
-	// Primary D3D11 API objects
-	inline Microsoft::WRL::ComPtr<ID3D11Device> Device;
-	inline Microsoft::WRL::ComPtr<ID3D11DeviceContext> Context;
-	inline Microsoft::WRL::ComPtr<IDXGISwapChain> SwapChain;
-
-	// Rendering buffers
-	inline Microsoft::WRL::ComPtr<ID3D11RenderTargetView> BackBufferRTV;
-	inline Microsoft::WRL::ComPtr<ID3D11DepthStencilView> DepthBufferDSV;
+	inline static const unsigned int numBackBuffers = 2;
+	inline unsigned int currentSwapBuffer;
+	inline Microsoft::WRL::ComPtr<ID3D12Device> Device;
+	inline Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain;
+	inline Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
+	inline Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
+	inline Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
+	inline size_t rtvDescriptorSize;
+	inline Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvHeap;
+	inline Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvHeap;
+	inline D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[numBackBuffers];
+	inline D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle;
+	inline Microsoft::WRL::ComPtr<ID3D12Resource> backBuffers[numBackBuffers];
+	inline Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilBuffer;
+	inline D3D12_VIEWPORT viewport;
+	inline D3D12_RECT scissorRect;
 
 	// --- FUNCTIONS ---
 

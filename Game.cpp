@@ -30,11 +30,6 @@ void Game::Initialize()
 	// - You'll be expanding and/or replacing these later
 	CreateRootSigAndPipelineState();
 	CreateBasicGeometry();
-
-	////
-	////
-	////
-	////
 }
 
 

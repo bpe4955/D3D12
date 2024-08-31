@@ -67,8 +67,8 @@ void Camera::Update(float dt)
 {
 	// Current speed
 	float speed = dt * movementSpeed;// Speed up or down as necessary
-	if (Input::KeyDown('X')) { speed *= 5; }
-	if (Input::KeyDown(VK_CONTROL)) { speed *= 0.1f; }
+	if (Input::KeyDown(VK_CONTROL)) { speed *= 5; }
+	if (Input::KeyDown('X')) { speed *= 0.1f; }
 
 	// Movement
 	if (Input::KeyDown('W')) { transform.MoveRelative(0, 0, speed); dirtyView = true; }
@@ -90,8 +90,8 @@ void Camera::Update(float dt)
 
 		// Clamp the X rotation
 		XMFLOAT3 rot = transform.GetPitchYawRoll();
-		if (rot.x > XM_PIDIV2) rot.x = XM_PIDIV2;
-		if (rot.x < -XM_PIDIV2) rot.x = -XM_PIDIV2;
+		if (rot.x >= XM_PIDIV2) rot.x = XM_PIDIV2 - 0.00001f;
+		if (rot.x <= -XM_PIDIV2) rot.x = -XM_PIDIV2 + 0.00001f;
 		transform.SetRotation(rot);
 	}
 
@@ -145,13 +145,17 @@ void Camera::UpdateProjectionMatrix(float aspectRatio)
 	XMStoreFloat4x4(&projMatrix, P);
 }
 
-DirectX::XMFLOAT4X4 Camera::GetView() 
-{ 
+DirectX::XMFLOAT4X4 Camera::GetView()
+{
 	if (dirtyView) { UpdateViewMatrix(); }
-	return viewMatrix; 
+	return viewMatrix;
 }
 DirectX::XMFLOAT4X4 Camera::GetProjection() { return projMatrix; }
-Transform* Camera::GetTransform() { return &transform; }
+Transform* Camera::GetTransform()
+{
+	dirtyView = true; // Assume some change is being made
+	return &transform;
+}
 
 float Camera::GetAspectRatio() { return aspectRatio; }
 
@@ -163,18 +167,18 @@ void Camera::SetFieldOfView(float fov)
 }
 
 float Camera::GetMovementSpeed() { return movementSpeed; }
-void Camera::SetMovementSpeed(float speed) 
-{ 
+void Camera::SetMovementSpeed(float speed)
+{
 	if (speed < 0.1f) { movementSpeed = 0.1f; return; }
-	movementSpeed = speed; 
+	movementSpeed = speed;
 }
 
 float Camera::GetMouseLookSpeed() { return mouseLookSpeed; }
-void Camera::SetMouseLookSpeed(float speed) 
-{ 
+void Camera::SetMouseLookSpeed(float speed)
+{
 	if (speed < 0.001f) { mouseLookSpeed = 0.001f; return; }
 	if (speed > 0.1f) { mouseLookSpeed = 0.1f; return; }
-	mouseLookSpeed = speed; 
+	mouseLookSpeed = speed;
 }
 
 float Camera::GetNearClip() { return nearClip; }

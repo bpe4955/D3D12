@@ -2,6 +2,11 @@
 
 #include <d3d12.h>
 #include <wrl/client.h>
+#include <vector>
+
+#include "Camera.h"
+#include "Mesh.h"
+#include "Entity.h"
 
 class Game
 {
@@ -29,12 +34,14 @@ private:
 	//  - This is a smart pointer for objects that abide by the
 	//     Component Object Model, which DirectX objects do
 	//  - More info here: https://github.com/Microsoft/DirectXTK/wiki/ComPtr
-
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexBuffer;
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW vbView;
-	D3D12_INDEX_BUFFER_VIEW ibView;
+
+	// Ideally later move this into a Scene object
+	std::vector<std::shared_ptr<Camera>> cameras;
+	unsigned int currentCameraIndex;
+
+	std::vector<std::shared_ptr<Mesh>> meshes;
+	std::vector<std::shared_ptr<Entity>> entities;
 };
 

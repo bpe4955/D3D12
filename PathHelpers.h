@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <d3d11.h>
 
 // Helpers for determining the actual path to the executable
 std::string GetExePath();

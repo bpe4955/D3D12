@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "Camera.h"
-#include "Mesh.h"
 #include "Entity.h"
 
 class Game
@@ -28,6 +27,8 @@ private:
 	// Initialization helper methods - feel free to customize, combine, remove, etc.
 	//void LoadShaders();
 	void CreateBasicGeometry();
+	void CreateBasicMaterials();
+	void CreateBasicEntities();
 	void CreateRootSigAndPipelineState();
 
 	// Note the usage of ComPtr below
@@ -42,6 +43,7 @@ private:
 	unsigned int currentCameraIndex;
 
 	std::vector<std::shared_ptr<Mesh>> meshes;
+	std::vector<std::shared_ptr<Material>> materials;
 	std::vector<std::shared_ptr<Entity>> entities;
 };
 

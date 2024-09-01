@@ -27,7 +27,9 @@ void Game::Initialize()
 	// geometry to draw and some simple camera matrices.
 	// - You'll be expanding and/or replacing these later
 	CreateRootSigAndPipelineState();
+	CreateBasicMaterials();
 	CreateBasicGeometry();
+	CreateBasicEntities();
 
 	// Set up camera
 	{
@@ -66,47 +68,96 @@ void Game::CreateRootSigAndPipelineState()
 	}
 	// Input layout
 	const unsigned int inputElementCount = 4;
-	D3D12_INPUT_ELEMENT_DESC inputElements[inputElementCount] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElements[inputElementCount] = {}; 
 	{
-		inputElements[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-		inputElements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT; // R32 G32 B32 = float3
-		inputElements[0].SemanticName = "POSITION"; // Name must match semantic in shader
-		inputElements[0].SemanticIndex = 0; // This is the first POSITION semantic
-		inputElements[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-		inputElements[1].Format = DXGI_FORMAT_R32G32_FLOAT; // R32 G32 = float2
-		inputElements[1].SemanticName = "TEXCOORD";
-		inputElements[1].SemanticIndex = 0; // This is the first TEXCOORD semantic
-		inputElements[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-		inputElements[2].Format = DXGI_FORMAT_R32G32B32_FLOAT; // R32 G32 B32 = float3
-		inputElements[2].SemanticName = "NORMAL";
-		inputElements[2].SemanticIndex = 0; // This is the first NORMAL semantic
-		inputElements[3].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-		inputElements[3].Format = DXGI_FORMAT_R32G32B32_FLOAT; // R32 G32 B32 = float3
-		inputElements[3].SemanticName = "TANGENT";
-		inputElements[3].SemanticIndex = 0; // This is the first TANGENT semantic
+		// Create an input layout that describes the vertex format
+		// used by the vertex shader we're using
+		//  - This is used by the pipeline to know how to interpret the raw data
+		//     sitting inside a vertex buffer
+
+		// Set up the first element - a position, which is 3 float values
+		inputElements[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT; // How far into the vertex is this?  Assume it's after the previous element
+		inputElements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// Most formats are described as color channels, really it just means "Three 32-bit floats"
+		inputElements[0].SemanticName = "POSITION";					// This is "POSITION" - needs to match the semantics in our vertex shader input!
+		inputElements[0].SemanticIndex = 0;							// This is the 0th position (there could be more)
+
+		// Set up the second element - a UV, which is 2 more float values
+		inputElements[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[1].Format = DXGI_FORMAT_R32G32_FLOAT;			// 2x 32-bit floats
+		inputElements[1].SemanticName = "TEXCOORD";					// Match our vertex shader input!
+		inputElements[1].SemanticIndex = 0;							// This is the 0th uv (there could be more)
+
+		// Set up the third element - a normal, which is 3 more float values
+		inputElements[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
+		inputElements[2].SemanticName = "NORMAL";					// Match our vertex shader input!
+		inputElements[2].SemanticIndex = 0;							// This is the 0th normal (there could be more)
+
+		// Set up the fourth element - a tangent, which is 2 more float values
+		inputElements[3].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
+		inputElements[3].SemanticName = "TANGENT";					// Match our vertex shader input!
+		inputElements[3].SemanticIndex = 0;							// This is the 0th tangent (there could be more)
 	}
+
 	// Root Signature
 	{
-		// Define a table of CBV's (constant buffer views)
-		D3D12_DESCRIPTOR_RANGE cbvTable = {};
-		cbvTable.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-		cbvTable.NumDescriptors = 1;
-		cbvTable.BaseShaderRegister = 0;
-		cbvTable.RegisterSpace = 0;
-		cbvTable.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-		// Define the root parameter
-		D3D12_ROOT_PARAMETER rootParam = {};
-		rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		rootParam.DescriptorTable.NumDescriptorRanges = 1;
-		rootParam.DescriptorTable.pDescriptorRanges = &cbvTable;
-		// Describe the overall the root signature
+		// Describe the range of CBVs needed for the vertex shader
+		D3D12_DESCRIPTOR_RANGE cbvRangeVS = {};
+		cbvRangeVS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+		cbvRangeVS.NumDescriptors = 1;
+		cbvRangeVS.BaseShaderRegister = 0;
+		cbvRangeVS.RegisterSpace = 0;
+		cbvRangeVS.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		// Describe the range of CBVs needed for the pixel shader
+		D3D12_DESCRIPTOR_RANGE cbvRangePS = {};
+		cbvRangePS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+		cbvRangePS.NumDescriptors = 1;
+		cbvRangePS.BaseShaderRegister = 0;
+		cbvRangePS.RegisterSpace = 0;
+		cbvRangePS.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		// Create a range of SRV's for textures
+		D3D12_DESCRIPTOR_RANGE srvRange = {};
+		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		srvRange.NumDescriptors = 4; // Set to max number of textures at once (match pixel shader!)
+		srvRange.BaseShaderRegister = 0; // Starts at s0 (match pixel shader!)
+		srvRange.RegisterSpace = 0;
+		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		// Create the root parameters
+		D3D12_ROOT_PARAMETER rootParams[3] = {};
+		// CBV table param for vertex shader
+		rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[0].DescriptorTable.pDescriptorRanges = &cbvRangeVS;
+		// CBV table param for pixel shader
+		rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[1].DescriptorTable.pDescriptorRanges = &cbvRangePS;
+		// SRV table param
+		rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[2].DescriptorTable.pDescriptorRanges = &srvRange;
+		// Create a single static sampler (available to all pixel shaders at the same slot)
+		D3D12_STATIC_SAMPLER_DESC anisoWrap = {};
+		anisoWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		anisoWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		anisoWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		anisoWrap.Filter = D3D12_FILTER_ANISOTROPIC;
+		anisoWrap.MaxAnisotropy = 16;
+		anisoWrap.MaxLOD = D3D12_FLOAT32_MAX;
+		anisoWrap.ShaderRegister = 0; // register(s0)
+		anisoWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		D3D12_STATIC_SAMPLER_DESC samplers[] = { anisoWrap };
+		// Describe the root signature
 		D3D12_ROOT_SIGNATURE_DESC rootSig = {};
 		rootSig.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-		rootSig.NumParameters = 1;
-		rootSig.pParameters = &rootParam;
-		rootSig.NumStaticSamplers = 0;
-		rootSig.pStaticSamplers = 0;
+		rootSig.NumParameters = ARRAYSIZE(rootParams);
+		rootSig.pParameters = rootParams;
+		rootSig.NumStaticSamplers = ARRAYSIZE(samplers);
+		rootSig.pStaticSamplers = samplers;
 		// Serialze the root signature
 		ID3DBlob* serializedRootSig = 0;
 		ID3DBlob* errors = 0;
@@ -150,7 +201,7 @@ void Game::CreateRootSigAndPipelineState()
 		psoDesc.SampleDesc.Quality = 0;
 		// -- States ---
 		psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-		psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+		psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		psoDesc.RasterizerState.DepthClipEnable = true;
 		psoDesc.DepthStencilState.DepthEnable = true;
 		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
@@ -172,15 +223,78 @@ void Game::CreateRootSigAndPipelineState()
 // --------------------------------------------------------
 void Game::CreateBasicGeometry()
 {
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../assets/Basic Meshes/sphere.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../assets/Basic Meshes/cube.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../assets/Basic Meshes/helix.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../assets/Basic Meshes/cylinder.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../assets/Basic Meshes/torus.obj").c_str()));
+	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/sphere.obj").c_str()));
+	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cube.obj").c_str()));
+	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/helix.obj").c_str()));
+	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cylinder.obj").c_str()));
+	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/torus.obj").c_str()));
+}
 
-	for (std::shared_ptr<Mesh> meshPtr : meshes)
+void Game::CreateBasicMaterials()
+{
+	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
+
+	// Load textures
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = 
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_albedo.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneNormals =
+		d3d12Helper.LoadTexture(FixPath(L"/../../Assets/Textures/PBR/cobblestone_normals.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneRoughness =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_roughness.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneMetal =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_metal.png").c_str());
+
+	D3D12_CPU_DESCRIPTOR_HANDLE bronzeAlbedo =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_albedo.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE bronzeNormals =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_normals.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE bronzeRoughness =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_roughness.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE bronzeMetal =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_metal.png").c_str());
+
+	D3D12_CPU_DESCRIPTOR_HANDLE scratchedAlbedo =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_albedo.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE scratchedNormals =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_normals.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE scratchedRoughness =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_roughness.png").c_str());
+	D3D12_CPU_DESCRIPTOR_HANDLE scratchedMetal =
+		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_metal.png").c_str());
+
+	// Create materials
+	// Note: Samplers are handled by a single static sampler in the
+	// root signature for this demo, rather than per-material
+	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	cobbleMat->AddTexture(cobblestoneAlbedo, 0);
+	cobbleMat->AddTexture(cobblestoneNormals, 1);
+	cobbleMat->AddTexture(cobblestoneRoughness, 2);
+	cobbleMat->AddTexture(cobblestoneMetal, 3);
+	cobbleMat->FinalizeMaterial();
+	materials.push_back(cobbleMat);
+
+	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	bronzeMat->AddTexture(bronzeAlbedo, 0);
+	bronzeMat->AddTexture(bronzeNormals, 1);
+	bronzeMat->AddTexture(bronzeRoughness, 2);
+	bronzeMat->AddTexture(bronzeMetal, 3);
+	bronzeMat->FinalizeMaterial();
+	materials.push_back(bronzeMat);
+
+	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
+	scratchedMat->AddTexture(scratchedAlbedo, 0);
+	scratchedMat->AddTexture(scratchedNormals, 1);
+	scratchedMat->AddTexture(scratchedRoughness, 2);
+	scratchedMat->AddTexture(scratchedMetal, 3);
+	scratchedMat->FinalizeMaterial();
+	materials.push_back(scratchedMat);
+}
+
+void Game::CreateBasicEntities()
+{
+	for (int i=0; i<meshes.size(); i++)
 	{
-		entities.push_back(std::make_shared<Entity>(meshPtr));
+		entities.push_back(std::make_shared<Entity>(meshes[i], materials[i % materials.size()]));
 	}
 }
 
@@ -254,6 +368,8 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	// Rendering here!
 	{
+		D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
+
 		// Set overall pipeline state
 		Graphics::commandList->SetPipelineState(pipelineState.Get());
 		// Root sig (must happen before root descriptor table)
@@ -262,30 +378,62 @@ void Game::Draw(float deltaTime, float totalTime)
 		Graphics::commandList->OMSetRenderTargets(1, &Graphics::rtvHandles[Graphics::currentSwapBuffer], true, &Graphics::dsvHandle);
 		Graphics::commandList->RSSetViewports(1, &Graphics::viewport);
 		Graphics::commandList->RSSetScissorRects(1, &Graphics::scissorRect);
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap =
-			D3D12Helper::GetInstance().GetCBVSRVDescriptorHeap();
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = d3d12Helper.GetCBVSRVDescriptorHeap();
 		Graphics::commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
 		Graphics::commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		// Draw
 		for (std::shared_ptr<Entity> entityPtr : entities)
 		{
-			// Fill out a VertexShaderExternalData struct with the entity’s world matrix and the camera’s matrices.
-			VertexShaderData data = {};
-			data.world = entityPtr->GetTransform()->GetWorldMatrix();
-			data.view = cameras[currentCameraIndex]->GetView();
-			data.proj = cameras[currentCameraIndex]->GetProjection();
-			// Use FillNextConstantBufferAndGetGPUDescriptorHandle() 
-			// to copy the above struct to the GPU and get back the corresponding handle to the constant buffer view.
-			D3D12_GPU_DESCRIPTOR_HANDLE handle =
-				D3D12Helper::GetInstance().FillNextConstantBufferAndGetGPUDescriptorHandle(&data, sizeof(VertexShaderData));
-			// Use commandList->SetGraphicsRootDescriptorTable(0, handle) to set the handle from the previous line.
-			Graphics::commandList->SetGraphicsRootDescriptorTable(0, handle);
+			// Vertex Data
+			{
+				// Fill out a VertexShaderExternalData struct with the entity’s world matrix and the camera’s matrices.
+				VertexShaderData data = {};
+				data.world = entityPtr->GetTransform()->GetWorldMatrix();
+				data.worldInvTranspose = entityPtr->GetTransform()->GetWorldInverseTransposeMatrix();
+				data.view = cameras[currentCameraIndex]->GetView();
+				data.proj = cameras[currentCameraIndex]->GetProjection();
+				// Use FillNextConstantBufferAndGetGPUDescriptorHandle() 
+				// to copy the above struct to the GPU and get back the corresponding handle to the constant buffer view.
+				D3D12_GPU_DESCRIPTOR_HANDLE handle =
+					d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&data), sizeof(VertexShaderData));
+				// Use commandList->SetGraphicsRootDescriptorTable(0, handle) to set the handle from the previous line.
+				Graphics::commandList->SetGraphicsRootDescriptorTable(0, handle);
+			}
+
+			// Pixel Shader
+			std::shared_ptr<Material> mat = entityPtr->GetMaterial();
+			Graphics::commandList->SetPipelineState(mat->GetPipelineState().Get());// Set the SRV descriptor handle for this material's textures
+			{
+				PixelShaderExternalData psData = {};
+				psData.uvScale = mat->GetUVScale();
+				psData.uvOffset = mat->GetUVOffset();
+				psData.cameraPosition = cameras[currentCameraIndex]->GetTransform()->GetPosition();
+				//psData.lightCount = lightCount;
+				//memcpy(psData.lights, &lights[0], sizeof(Light) * MAX_LIGHTS);
+
+				// Send this to a chunk of the constant buffer heap
+				// and grab the GPU handle for it so we can set it for this draw
+				D3D12_GPU_DESCRIPTOR_HANDLE cbHandlePS = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
+					(void*)(&psData), sizeof(PixelShaderExternalData));
+
+				// Set this constant buffer handle
+				// Note: This assumes that descriptor table 1 is the
+				//       place to put this particular descriptor.  This
+				//       is based on how we set up our root signature.
+				Graphics::commandList->SetGraphicsRootDescriptorTable(1, cbHandlePS);
+			}
+			// Set the SRV descriptor handle for this material's textures
+			// Note: This assumes that descriptor table 2 is for textures (as per our root sig)
+			Graphics::commandList->SetGraphicsRootDescriptorTable(2, mat->GetFinalGPUHandleForTextures());
+
+
 			// Grab the vertex buffer view and index buffer view from this entity’s mesh
 			D3D12_INDEX_BUFFER_VIEW indexBuffView = entityPtr->GetMesh()->GetIndexBufferView();
 			D3D12_VERTEX_BUFFER_VIEW vertexBuffView = entityPtr->GetMesh()->GetVertexBufferView();
 			// Set them using IASetVertexBuffers() and IASetIndexBuffer()
 			Graphics::commandList->IASetIndexBuffer(&indexBuffView);
 			Graphics::commandList->IASetVertexBuffers(0, 1, &vertexBuffView);
+
 			// Call DrawIndexedInstanced() using the index count of this entity’s mesh
 			Graphics::commandList->DrawIndexedInstanced(entityPtr->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
 		}

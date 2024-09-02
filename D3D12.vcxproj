@@ -220,6 +220,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Lighting.hlsli" />
     <None Include="packages.config" />
     <None Include="ShaderIncludes.hlsli" />
   </ItemGroup>

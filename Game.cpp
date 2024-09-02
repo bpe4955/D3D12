@@ -12,7 +12,9 @@
 // Needed for a helper function to load pre-compiled shader files
 #pragma comment(lib, "d3dcompiler.lib")
 #include <d3dcompiler.h>
-#include "BufferStructs.h"
+
+// Helper macro for getting a float between min and max
+#define RandomRange(min, max) (float)rand() / RAND_MAX * (max - min) + min
 
 // For the DirectX Math library
 using namespace DirectX;
@@ -30,6 +32,7 @@ void Game::Initialize()
 	CreateBasicMaterials();
 	CreateBasicGeometry();
 	CreateBasicEntities();
+	CreateLights();
 
 	// Set up camera
 	{
@@ -298,6 +301,65 @@ void Game::CreateBasicEntities()
 	}
 }
 
+void Game::CreateLights()
+{
+	// Reset
+	lights.clear();
+
+	// Setup lights
+	Light change = {};
+	change.Type = LIGHT_TYPE_SPOT;
+	change.Color = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	change.Intensity = 0.5f;
+	change.Range = 5.f;
+	change.SpotFalloff = 25.f;
+
+	Light dir = {};
+	dir.Type = LIGHT_TYPE_DIRECTIONAL;
+	dir.Direction = XMFLOAT3(0, 1, -1);
+	dir.Color = XMFLOAT3(1.f, 0.f, 0.f);
+	dir.Intensity = 1.0f;
+
+	Light poi = {};
+	poi.Type = LIGHT_TYPE_POINT;
+	poi.Color = XMFLOAT3(0.0f, 0.0f, 1.0f);
+	poi.Intensity = 1.0f;
+	poi.Position = XMFLOAT3(10.0f, 0, 0);
+	poi.Range = 20.f;
+	
+	Light spot = {};
+	spot.Type = LIGHT_TYPE_SPOT;
+	spot.Direction = XMFLOAT3(0, 0, 1);
+	spot.Color = XMFLOAT3(0.f, 1.f, 0.f);
+	spot.Intensity = 1.0f;
+	spot.Position = XMFLOAT3(10, 0, -5.f);
+	spot.Range = 20.f;
+	spot.SpotFalloff = 500.f;
+
+	// Add light to the list
+	lights.push_back(change);
+	lights.push_back(dir);
+	lights.push_back(poi);
+	lights.push_back(spot);
+
+	// Create the rest of the lights
+	while (lights.size() < MAX_LIGHTS)
+	{
+		Light point = {};
+		point.Type = LIGHT_TYPE_POINT;
+		point.Position = XMFLOAT3(RandomRange(-15.0f, 15.0f), RandomRange(-2.0f, 5.0f), RandomRange(-15.0f, 15.0f));
+		point.Color = XMFLOAT3(RandomRange(0, 1), RandomRange(0, 1), RandomRange(0, 1));
+		point.Range = RandomRange(5.0f, 10.0f);
+		point.Intensity = RandomRange(0.01f, 0.12f);
+	
+		// Add to the list
+		lights.push_back(point);
+	}
+
+	// Make sure we're exactly MAX_LIGHTS big
+	lights.resize(MAX_LIGHTS);
+}
+
 
 // --------------------------------------------------------
 // Handle resizing to match the new window size
@@ -327,8 +389,12 @@ void Game::Update(float deltaTime, float totalTime)
 			XMFLOAT3((float)i * 5, (float)sin(i + totalTime), 0));
 	}
 
-
 	cameras[currentCameraIndex]->Update(deltaTime);
+
+	lights[0].Position = cameras[currentCameraIndex]->GetTransform()->GetPosition();
+	lights[0].Direction = cameras[currentCameraIndex]->GetTransform()->GetForward();
+	//XMFLOAT3 camPos = cameras[currentCameraIndex]->GetTransform()->GetPosition();
+	//printf("Camera Position: %f, %f, %f \n", camPos.x, camPos.y, camPos.z);
 }
 
 
@@ -351,7 +417,8 @@ void Game::Draw(float deltaTime, float totalTime)
 		rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		Graphics::commandList->ResourceBarrier(1, &rb);
 		// Background color (Cornflower Blue in this case) for clearing
-		float color[] = { 0.4f, 0.6f, 0.75f, 1.0f };
+		//float color[] = { 0.4f, 0.6f, 0.75f, 1.0f };
+		float color[] = { 0.1f, 0.15f, 0.1875f, 1.0f };
 		// Clear the RTV
 		Graphics::commandList->ClearRenderTargetView(
 			Graphics::rtvHandles[Graphics::currentSwapBuffer],
@@ -404,17 +471,17 @@ void Game::Draw(float deltaTime, float totalTime)
 			std::shared_ptr<Material> mat = entityPtr->GetMaterial();
 			Graphics::commandList->SetPipelineState(mat->GetPipelineState().Get());// Set the SRV descriptor handle for this material's textures
 			{
-				PixelShaderExternalData psData = {};
+				PixelShaderData psData = {};
 				psData.uvScale = mat->GetUVScale();
 				psData.uvOffset = mat->GetUVOffset();
 				psData.cameraPosition = cameras[currentCameraIndex]->GetTransform()->GetPosition();
-				//psData.lightCount = lightCount;
-				//memcpy(psData.lights, &lights[0], sizeof(Light) * MAX_LIGHTS);
+				psData.lightCount = (int)lights.size();
+				memcpy(psData.lights, &lights[0], sizeof(Light) * MAX_LIGHTS);
 
 				// Send this to a chunk of the constant buffer heap
 				// and grab the GPU handle for it so we can set it for this draw
 				D3D12_GPU_DESCRIPTOR_HANDLE cbHandlePS = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
-					(void*)(&psData), sizeof(PixelShaderExternalData));
+					(void*)(&psData), sizeof(PixelShaderData));
 
 				// Set this constant buffer handle
 				// Note: This assumes that descriptor table 1 is the

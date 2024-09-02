@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <vector>
+#include "BufferStructs.h"
 
 #include "Camera.h"
 #include "Entity.h"
@@ -29,6 +30,7 @@ private:
 	void CreateBasicGeometry();
 	void CreateBasicMaterials();
 	void CreateBasicEntities();
+	void CreateLights();
 	void CreateRootSigAndPipelineState();
 
 	// Note the usage of ComPtr below
@@ -45,5 +47,6 @@ private:
 	std::vector<std::shared_ptr<Mesh>> meshes;
 	std::vector<std::shared_ptr<Material>> materials;
 	std::vector<std::shared_ptr<Entity>> entities;
+	std::vector<Light> lights;
 };
 

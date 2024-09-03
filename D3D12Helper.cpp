@@ -7,7 +7,10 @@ using namespace DirectX;
 // Singleton requirement
 D3D12Helper* D3D12Helper::instance;
 
-D3D12Helper::~D3D12Helper() { }
+D3D12Helper::~D3D12Helper() 
+{
+	delete[] frameSyncFenceCounters;
+}
 
 // --------------------------------------------------------
 // Sets up the helper with required DX12 objects
@@ -16,38 +19,40 @@ void D3D12Helper::Initialize(
 	Microsoft::WRL::ComPtr<ID3D12Device> device,
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList,
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue,
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator)
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators,
+	unsigned int numBackBuffers)
 {
 	// Save objects
 	this->device = device;
 	this->commandList = commandList;
 	this->commandQueue = commandQueue;
-	this->commandAllocator = commandAllocator;
+	this->commandAllocators = commandAllocators;
+	this->numBackBuffers = numBackBuffers;
 	// Create the fence for basic synchronization
 	device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(waitFence.GetAddressOf()));
 	waitFenceEvent = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
+	// Create the fence for frame sync
+	device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(frameSyncFence.GetAddressOf()));
+	frameSyncFenceEvent = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
+	frameSyncFenceCounters = new UINT64[numBackBuffers];
+	ZeroMemory(frameSyncFenceCounters, sizeof(UINT64) * numBackBuffers);
 
 	// Create heaps for buffer wrangling
 	CreateConstantBufferUploadHeap();
 	CreateCBVSRVDescriptorHeap();
 }
 // --------------------------------------------------------
-// Closes the current command list and tells the GPU to start executing those commands.
-// We also wait for the GPU to finish this work so we can reset the command allocator
-// (which CANNOT be reset while the GPU is using its commands) and the command list itself.
+// Closes the current command list and tells the GPU to
+// start executing those commands.  This will NOT wait
+// for the GPU or reset the command list!  The caller
+// must do those if necessary.
 // --------------------------------------------------------
-void D3D12Helper::CloseExecuteAndResetCommandList()
+void D3D12Helper::ExecuteCommandList()
 {
 	// Close the current list and execute it as our only list
 	commandList->Close();
 	ID3D12CommandList* lists[] = { commandList.Get() };
 	commandQueue->ExecuteCommandLists(1, lists);
-	// Always wait before reseting command allocator, as it should not
-	// be reset while the GPU is processing a command list
-	// See: https://docs.microsoft.com/en-us/windows/desktop/api/d3d12/nf-d3d12-id3d12commandallocator-reset
-	WaitForGPU();
-	commandAllocator->Reset();
-	commandList->Reset(commandAllocator.Get(), 0);
 }
 // --------------------------------------------------------
 // Makes our C++ code wait for the GPU to finish its
@@ -68,6 +73,38 @@ void D3D12Helper::WaitForGPU()
 		waitFence->SetEventOnCompletion(waitFenceCounter, waitFenceEvent);
 		WaitForSingleObject(waitFenceEvent, INFINITE);
 	}
+}
+
+// --------------------------------------------------------
+// Adds a signal to the command queue so we can track
+// which frames have been completed.
+// --------------------------------------------------------
+unsigned int D3D12Helper::SyncSwapChain(unsigned int currentSwapBufferIndex)
+{
+	// Grab the current fence value so we can adjust it for the next frame,
+	// but first use it to signal this frame being done
+	UINT64 currentFenceCounter = frameSyncFenceCounters[currentSwapBufferIndex];
+	commandQueue->Signal(frameSyncFence.Get(), currentFenceCounter);
+
+	// Calculate the next index
+	unsigned int nextBuffer = currentSwapBufferIndex + 1;
+	nextBuffer %= numBackBuffers;
+
+	// Do we need to wait for the next frame?  We do this by checking the counter
+	// associated with that frame's buffer and waiting if it's not complete
+	if (frameSyncFence->GetCompletedValue() < frameSyncFenceCounters[nextBuffer])
+	{
+		// Not completed, so we wait
+		frameSyncFence->SetEventOnCompletion(frameSyncFenceCounters[nextBuffer], frameSyncFenceEvent);
+		WaitForSingleObject(frameSyncFenceEvent, INFINITE);
+	}
+
+	// Frame is done, so update the next frame's counter
+	frameSyncFenceCounters[nextBuffer] = currentFenceCounter + 1;
+
+	// Return the new buffer index, which the caller can
+	// use to track which buffer to use for the next frame
+	return nextBuffer;
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE D3D12Helper::LoadTexture(const wchar_t* file, bool generateMips)
@@ -225,6 +262,27 @@ void D3D12Helper::CreateCBVSRVDescriptorHeap()
 Microsoft::WRL::ComPtr<ID3D12Resource> D3D12Helper::CreateStaticBuffer(
 	unsigned int dataStride, unsigned int dataCount, void* data)
 {
+	// Creates a temporary command allocator and list so we don't
+	// screw up any other ongoing work (since resetting a command allocator
+	// cannot happen while its list is being executed).  These ComPtrs will
+	// be cleaned up automatically when they go out of scope.
+	// Note: This certainly isn't efficient, but hopefully this only
+	//       happens during start-up.  Otherwise, refactor this to use
+	//       the existing list and allocator(s).
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> localAllocator;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> localList;
+
+	device->CreateCommandAllocator(
+		D3D12_COMMAND_LIST_TYPE_DIRECT,
+		IID_PPV_ARGS(localAllocator.GetAddressOf()));
+
+	device->CreateCommandList(
+		0,								// Which physical GPU will handle these tasks?  0 for single GPU setup
+		D3D12_COMMAND_LIST_TYPE_DIRECT,	// Type of command list - direct is for standard API calls
+		localAllocator.Get(),			// The allocator for this list (to start)
+		0,								// Initial pipeline state - none for now
+		IID_PPV_ARGS(localList.GetAddressOf()));
+
 	// The overall buffer we'll be creating
 	Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
 	// Describes the final heap
@@ -274,7 +332,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> D3D12Helper::CreateStaticBuffer(
 	memcpy(gpuAddress, data, dataStride * dataCount);
 	uploadHeap->Unmap(0, 0);
 	// Copy the whole buffer from uploadheap to vert buffer
-	commandList->CopyResource(buffer.Get(), uploadHeap.Get());
+	localList->CopyResource(buffer.Get(), uploadHeap.Get());
 	// Transition the buffer to generic read for the rest of the app lifetime (presumable)
 	D3D12_RESOURCE_BARRIER rb = {};
 	rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -283,9 +341,15 @@ Microsoft::WRL::ComPtr<ID3D12Resource> D3D12Helper::CreateStaticBuffer(
 	rb.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 	rb.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
 	rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	commandList->ResourceBarrier(1, &rb);
+	localList->ResourceBarrier(1, &rb);
 	// Execute the command list and return the finished buffer
-	CloseExecuteAndResetCommandList();
+	// Execute the local command list and wait for it to complete
+	// before returning the final buffer
+	localList->Close();
+	ID3D12CommandList* list[] = { localList.Get() };
+	commandQueue->ExecuteCommandLists(1, list);
+
+	WaitForGPU();
 	return buffer;
 }
 

@@ -84,8 +84,7 @@ HRESULT Graphics::Initialize(unsigned int windowWidth, unsigned int windowHeight
 	currentSwapBuffer = 0;
 	rtvDescriptorSize = 0;
 	dsvHandle = {};
-	rtvHandles[0] = {};
-	rtvHandles[1] = {};
+	for (int i = 0; i < numBackBuffers; i++) { rtvHandles[i] = {}; }
 	scissorRect = {};
 
 
@@ -130,9 +129,13 @@ HRESULT Graphics::Initialize(unsigned int windowWidth, unsigned int windowHeight
 	// which are necessary pieces for issuing standard API calls
 	{
 		// Set up allocator
-		Device->CreateCommandAllocator(
-			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			IID_PPV_ARGS(commandAllocator.GetAddressOf()));
+		for (unsigned int i = 0; i < numBackBuffers; i++)
+		{
+			// Set up allocators
+			Device->CreateCommandAllocator(
+				D3D12_COMMAND_LIST_TYPE_DIRECT,
+				IID_PPV_ARGS(commandAllocators[i].GetAddressOf()));
+		}
 		// Command queue
 		D3D12_COMMAND_QUEUE_DESC qDesc = {};
 		qDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -142,7 +145,7 @@ HRESULT Graphics::Initialize(unsigned int windowWidth, unsigned int windowHeight
 		Device->CreateCommandList(
 			0, // Which physical GPU will handle these tasks? 0 for single GPU setup
 			D3D12_COMMAND_LIST_TYPE_DIRECT, // Type of list - direct is for standard API calls
-			commandAllocator.Get(), // The allocator for this list
+			commandAllocators[0].Get(), // The allocator for this list
 			0, // Initial pipeline state - none for now
 			IID_PPV_ARGS(commandList.GetAddressOf()));
 	}
@@ -155,7 +158,8 @@ HRESULT Graphics::Initialize(unsigned int windowWidth, unsigned int windowHeight
 			Device,
 			commandList,
 			commandQueue,
-			commandAllocator);
+			commandAllocators,
+			numBackBuffers);
 	}
 
 	// Swap chain creation

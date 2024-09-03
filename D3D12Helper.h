@@ -33,7 +33,8 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12Device> device,
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList,
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue,
-		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator);
+		Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators,
+		unsigned int numBackBuffers);
 	// Resource creation
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateStaticBuffer(
 		unsigned int dataStride,
@@ -45,8 +46,9 @@ public:
 		void* data,
 		unsigned int dataSizeInBytes);
 	// Command list & synchronization
-	void CloseExecuteAndResetCommandList();
+	void ExecuteCommandList();
 	void WaitForGPU();
+	unsigned int SyncSwapChain(unsigned int currentSwapBufferIndex);
 	// Texture Loading
 	D3D12_CPU_DESCRIPTOR_HANDLE LoadTexture(const wchar_t* file, bool generateMips = true);
 	D3D12_GPU_DESCRIPTOR_HANDLE CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(
@@ -61,8 +63,9 @@ private:
 	// complex engines but should be fine for now
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators = {};
 	// Basic CPU/GPU synchronization
+	unsigned int numBackBuffers = 3;
 	Microsoft::WRL::ComPtr<ID3D12Fence> waitFence = {};
 	HANDLE waitFenceEvent = {};
 	unsigned long waitFenceCounter = 0;
@@ -82,6 +85,10 @@ private:
 	unsigned int cbvDescriptorOffset = 0;
 	void CreateConstantBufferUploadHeap();
 	void CreateCBVSRVDescriptorHeap();
+	// Frame sync'ing
+	Microsoft::WRL::ComPtr<ID3D12Fence> frameSyncFence = {};
+	HANDLE								frameSyncFenceEvent = {};
+	UINT64*								frameSyncFenceCounters = 0;
 
 	// Maximum number of texture descriptors (SRVs) we can have.
 	// Each material will have a chunk of this,

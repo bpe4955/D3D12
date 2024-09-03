@@ -39,6 +39,9 @@ void Game::Initialize()
 		cameras.push_back(std::make_shared<Camera>(XMFLOAT3(10, 0.75, -5.0f), 1.0f, 0.01f, 90.0f, Window::AspectRatio()));
 		currentCameraIndex = 0;
 	}
+
+	// Ensure the command list is closed going into Draw for the first time
+	Graphics::commandList->Close();
 }
 
 
@@ -403,6 +406,12 @@ void Game::Update(float deltaTime, float totalTime)
 // --------------------------------------------------------
 void Game::Draw(float deltaTime, float totalTime)
 {
+	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
+	// Reset allocator associated with the current buffer
+	// and set up the command list to use that allocator
+	Graphics::commandAllocators[Graphics::currentSwapBuffer]->Reset();
+	Graphics::commandList->Reset(Graphics::commandAllocators[Graphics::currentSwapBuffer].Get(), 0);
+
 	// Grab the current back buffer for this frame
 	Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer = Graphics::backBuffers[Graphics::currentSwapBuffer];
 	// Clearing the render target
@@ -435,8 +444,6 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	// Rendering here!
 	{
-		D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
-
 		// Set overall pipeline state
 		Graphics::commandList->SetPipelineState(pipelineState.Get());
 		// Root sig (must happen before root descriptor table)
@@ -519,16 +526,15 @@ void Game::Draw(float deltaTime, float totalTime)
 		rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		Graphics::commandList->ResourceBarrier(1, &rb);
 		// Must occur BEFORE present
-		D3D12Helper::GetInstance().CloseExecuteAndResetCommandList();
+		D3D12Helper::GetInstance().ExecuteCommandList();
 		// Present the current back buffer
 		bool vsyncNecessary = Graphics::VsyncState();
 		Graphics::swapChain->Present(
 			vsyncNecessary ? 1 : 0,
 			vsyncNecessary ? 0 : DXGI_PRESENT_ALLOW_TEARING);
+
 		// Figure out which buffer is next
-		Graphics::currentSwapBuffer++;
-		if (Graphics::currentSwapBuffer >= Graphics::numBackBuffers)
-			Graphics::currentSwapBuffer = 0;
+		Graphics::currentSwapBuffer = d3d12Helper.SyncSwapChain(Graphics::currentSwapBuffer);
 	}
 
 }

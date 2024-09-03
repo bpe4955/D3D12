@@ -12,12 +12,11 @@
 namespace Graphics
 {
 	// --- GLOBAL VARS ---
-
-	inline static const unsigned int numBackBuffers = 2;
+	inline static const unsigned int numBackBuffers = 3;
 	inline unsigned int currentSwapBuffer;
 	inline Microsoft::WRL::ComPtr<ID3D12Device> Device;
 	inline Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain;
-	inline Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
+	inline Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocators[numBackBuffers];
 	inline Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
 	inline Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
 	inline size_t rtvDescriptorSize;

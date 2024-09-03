@@ -302,6 +302,9 @@ void Game::CreateBasicEntities()
 	{
 		entities.push_back(std::make_shared<Entity>(meshes[i], materials[i % materials.size()]));
 	}
+	entities.push_back(std::make_shared<Entity>(meshes[0], materials[0]));
+	entities.back()->GetTransform()->SetScale(0.5f);
+	entities.back()->GetTransform()->SetParent(entities[0]->GetTransform().get(), true);
 }
 
 void Game::CreateLights()
@@ -386,11 +389,12 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::KeyDown(VK_ESCAPE))
 		Window::Quit();
 
-	for (int i = 0; i < entities.size(); i++)
+	for (int i = 0; i < entities.size()-1; i++)
 	{
 		entities[i]->GetTransform()->SetPosition(
 			XMFLOAT3((float)i * 5, (float)sin(i + totalTime), 0));
 	}
+	entities.back()->GetTransform()->SetPosition(XMFLOAT3((float)sin(totalTime), 1, (float)cos(totalTime)));
 
 	cameras[currentCameraIndex]->Update(deltaTime);
 

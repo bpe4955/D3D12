@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DirectXMath.h>
+#include <vector>
 
 class Transform
 {
@@ -26,6 +27,7 @@ public:
 	void SetScale(float uniformScale);
 	void SetScale(float x, float y, float z);
 	void SetScale(DirectX::XMFLOAT3 scale);
+	void SetTransformsFromMatrix(DirectX::XMFLOAT4X4 worldMatrix);
 
 	// Getters
 	DirectX::XMFLOAT3 GetPosition();
@@ -40,6 +42,15 @@ public:
 	// Matrix getters
 	DirectX::XMFLOAT4X4 GetWorldMatrix();
 	DirectX::XMFLOAT4X4 GetWorldInverseTransposeMatrix();
+
+	// Hierarchy
+	void AddChild(Transform* child, bool makeChildRelative = true);
+	void RemoveChild(Transform* child, bool applyParentTransform = true);
+	void SetParent(Transform* newParent, bool makeChildRelative = true);
+	Transform* GetParent();
+	Transform* GetChild(unsigned int index);
+	int IndexOfChild(Transform* child);
+	unsigned int GetChildCount();
 
 private:
 	// Raw transformation data
@@ -61,5 +72,12 @@ private:
 	// Helper to update both matrices if necessary
 	void UpdateMatrices();
 	void UpdateVectors();
+
+	DirectX::XMFLOAT3 QuaternionToEuler(DirectX::XMFLOAT4 quaternion);
+
+	// Hierarchy
+	Transform* parent;
+	std::vector<Transform*> children;
+	void MarkChildTransformsDirty();
 };
 

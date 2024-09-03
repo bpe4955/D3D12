@@ -9,6 +9,7 @@ D3D12Helper* D3D12Helper::instance;
 
 D3D12Helper::~D3D12Helper() 
 {
+	WaitForGPU();
 	delete[] frameSyncFenceCounters;
 }
 

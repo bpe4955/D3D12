@@ -32,6 +32,7 @@ void D3D12Helper::Initialize(
 	// Create the fence for basic synchronization
 	device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(waitFence.GetAddressOf()));
 	waitFenceEvent = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
+	waitFenceCounter = 0;
 	// Create the fence for frame sync
 	device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(frameSyncFence.GetAddressOf()));
 	frameSyncFenceEvent = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
@@ -73,6 +74,16 @@ void D3D12Helper::WaitForGPU()
 		// sit an wait until that fence is hit.
 		waitFence->SetEventOnCompletion(waitFenceCounter, waitFenceEvent);
 		WaitForSingleObject(waitFenceEvent, INFINITE);
+	}
+}
+
+void D3D12Helper::ResetFrameSyncCountersAndAllocators()
+{
+	ZeroMemory(frameSyncFenceCounters, sizeof(UINT64) * numBackBuffers);
+	for (int i = 0; i < numBackBuffers; i++)
+	{
+		SyncSwapChain(i);
+		commandAllocators[i]->Reset();
 	}
 }
 

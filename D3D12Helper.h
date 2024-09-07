@@ -48,7 +48,7 @@ public:
 	// Command list & synchronization
 	void ExecuteCommandList();
 	void WaitForGPU();
-	void ResetFrameSyncCountersAndAllocators();
+	void ResetFrameSyncCounters();
 	unsigned int SyncSwapChain(unsigned int currentSwapBufferIndex);
 	// Texture Loading
 	D3D12_CPU_DESCRIPTOR_HANDLE LoadTexture(const wchar_t* file, bool generateMips = true);

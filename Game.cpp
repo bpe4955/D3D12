@@ -234,6 +234,8 @@ void Game::CreateBasicGeometry()
 	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/helix.obj").c_str()));
 	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cylinder.obj").c_str()));
 	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/torus.obj").c_str()));
+	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Models/Pikachu(Gigantamax).fbx").c_str()));
+	
 }
 
 void Game::CreateBasicMaterials()
@@ -302,6 +304,11 @@ void Game::CreateBasicEntities()
 	{
 		entities.push_back(std::make_shared<Entity>(meshes[i], materials[i % materials.size()]));
 	}
+	entities.back()->GetTransform()->SetScale(0.025f);
+	entities.back()->GetTransform()->SetRotation(XMFLOAT3(XM_PIDIV2, 0, 0));
+
+
+
 	entities.push_back(std::make_shared<Entity>(meshes[0], materials[0]));
 	entities.back()->GetTransform()->SetScale(0.5f);
 	entities.back()->GetTransform()->SetParent(entities[0]->GetTransform().get(), true);

@@ -77,13 +77,12 @@ void D3D12Helper::WaitForGPU()
 	}
 }
 
-void D3D12Helper::ResetFrameSyncCountersAndAllocators()
+void D3D12Helper::ResetFrameSyncCounters()
 {
 	ZeroMemory(frameSyncFenceCounters, sizeof(UINT64) * numBackBuffers);
 	for (int i = 0; i < numBackBuffers; i++)
 	{
 		SyncSwapChain(i);
-		commandAllocators[i]->Reset();
 	}
 }
 

@@ -90,13 +90,14 @@ void Mesh::LoadModelAssimp(std::string fileName)
 		return;
 	}
 
-	// Load all meshes (assimp separates a model into a mesh for each material)
+	// Load all meshes into one mesh (assimp separates a model into a mesh for each material)
+	// Ideally, each mesh would be loaded in its own mesh with its own material
 	std::vector<Vertex> vertices;
 	std::vector<unsigned int> indices;
-	/*scene->mNumMeshes*/
-	for (size_t meshIndex = 0; meshIndex < 1; meshIndex++) // Only read the first mesh for now
+	for (size_t meshIndex = 0; meshIndex < scene->mNumMeshes; meshIndex++) 
 	{
 		aiMesh* readMesh = scene->mMeshes[meshIndex];
+		int numVertices = vertices.size();
 
 		// Material Data
 		//aiMaterial* material = scene->mMaterials[readMesh->mMaterialIndex];
@@ -152,7 +153,7 @@ void Mesh::LoadModelAssimp(std::string fileName)
 			//assert(readMesh->mFaces[i].mNumIndices == 3);
 			for (size_t f = 0; f < readMesh->mFaces[i].mNumIndices; f++)
 			{
-				indices.push_back(readMesh->mFaces[i].mIndices[f]);
+				indices.push_back(readMesh->mFaces[i].mIndices[f]+numVertices);
 			}
 		}
 	}

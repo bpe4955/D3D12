@@ -361,7 +361,7 @@ void Graphics::ResizeBuffers(unsigned int windowWidth, unsigned int windowHeight
 	}
 	// Reset back to the first back buffer
 	currentSwapBuffer = 0;
-	D3D12Helper::GetInstance().ResetFrameSyncCountersAndAllocators();
+	D3D12Helper::GetInstance().ResetFrameSyncCounters();
 	// Reset the depth buffer and create it again
 	{
 		depthStencilBuffer.Reset();

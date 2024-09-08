@@ -44,7 +44,7 @@ private:
 	std::vector<std::shared_ptr<Camera>> cameras;
 	unsigned int currentCameraIndex;
 
-	std::vector<std::shared_ptr<Mesh>> meshes;
+	//std::vector<std::shared_ptr<Mesh>> meshes;
 	std::vector<std::shared_ptr<Material>> materials;
 	std::vector<std::shared_ptr<Entity>> entities;
 	std::vector<Light> lights;

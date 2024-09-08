@@ -97,7 +97,7 @@ void Mesh::LoadModelAssimp(std::string fileName)
 	for (size_t meshIndex = 0; meshIndex < scene->mNumMeshes; meshIndex++) 
 	{
 		aiMesh* readMesh = scene->mMeshes[meshIndex];
-		int numVertices = vertices.size();
+		int numVertices = (int)vertices.size();
 
 		// Material Data
 		//aiMaterial* material = scene->mMaterials[readMesh->mMaterialIndex];

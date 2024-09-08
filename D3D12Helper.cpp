@@ -80,7 +80,7 @@ void D3D12Helper::WaitForGPU()
 void D3D12Helper::ResetFrameSyncCounters()
 {
 	ZeroMemory(frameSyncFenceCounters, sizeof(UINT64) * numBackBuffers);
-	for (int i = 0; i < numBackBuffers; i++)
+	for (int i = 0; i < (int)numBackBuffers; i++)
 	{
 		SyncSwapChain(i);
 	}

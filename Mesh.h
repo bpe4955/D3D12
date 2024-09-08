@@ -23,7 +23,6 @@ public:
 	/// <param name="indices">The mesh's indices</param>
 	void CreateBuffers(Vertex* vertices, unsigned int* indices);
 	void LoadModelAssimp(std::string relativeFilePath);
-	void LoadModelGiven(std::string relativeFilePath);
 	/// <summary>
 	/// Returns the Vertex Buffer ComPtr
 	/// </summary>

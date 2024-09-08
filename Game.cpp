@@ -4,6 +4,7 @@
 #include "Input.h"
 #include "PathHelpers.h"
 #include "Window.h"
+#include "Assets.h"
 
 #include "D3D12Helper.h"
 
@@ -25,6 +26,8 @@ using namespace DirectX;
 // --------------------------------------------------------
 void Game::Initialize()
 {
+	Assets::GetInstance().Initialize(L"..\\..\\Assets\\", Graphics::Device, true);
+	
 	// Helper methods for loading shaders, creating some basic
 	// geometry to draw and some simple camera matrices.
 	// - You'll be expanding and/or replacing these later
@@ -54,6 +57,8 @@ void Game::Initialize()
 Game::~Game()
 {
 	D3D12Helper::GetInstance().WaitForGPU();
+
+	delete& Assets::GetInstance();
 }
 
 // --------------------------------------------------------
@@ -229,12 +234,12 @@ void Game::CreateRootSigAndPipelineState()
 // --------------------------------------------------------
 void Game::CreateBasicGeometry()
 {
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/sphere.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cube.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/helix.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cylinder.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/torus.obj").c_str()));
-	meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Models/Pikachu(Gigantamax).fbx").c_str()));
+	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/sphere.obj").c_str()));
+	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cube.obj").c_str()));
+	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/helix.obj").c_str()));
+	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cylinder.obj").c_str()));
+	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/torus.obj").c_str()));
+	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Models/Pikachu(Gigantamax).fbx").c_str()));
 	
 }
 
@@ -243,73 +248,84 @@ void Game::CreateBasicMaterials()
 	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
 
 	// Load textures
-	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = 
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_albedo.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneNormals =
-		d3d12Helper.LoadTexture(FixPath(L"/../../Assets/Textures/PBR/cobblestone_normals.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneRoughness =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_roughness.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneMetal =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_metal.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = 
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_albedo.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneNormals =
+	//	d3d12Helper.LoadTexture(FixPath(L"/../../Assets/Textures/PBR/cobblestone_normals.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneRoughness =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_roughness.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneMetal =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_metal.png").c_str());
+	//
+	//D3D12_CPU_DESCRIPTOR_HANDLE bronzeAlbedo =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_albedo.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE bronzeNormals =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_normals.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE bronzeRoughness =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_roughness.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE bronzeMetal =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_metal.png").c_str());
+	//
+	//D3D12_CPU_DESCRIPTOR_HANDLE scratchedAlbedo =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_albedo.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE scratchedNormals =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_normals.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE scratchedRoughness =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_roughness.png").c_str());
+	//D3D12_CPU_DESCRIPTOR_HANDLE scratchedMetal =
+	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_metal.png").c_str());
 
-	D3D12_CPU_DESCRIPTOR_HANDLE bronzeAlbedo =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_albedo.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE bronzeNormals =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_normals.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE bronzeRoughness =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_roughness.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE bronzeMetal =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_metal.png").c_str());
-
-	D3D12_CPU_DESCRIPTOR_HANDLE scratchedAlbedo =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_albedo.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE scratchedNormals =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_normals.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE scratchedRoughness =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_roughness.png").c_str());
-	D3D12_CPU_DESCRIPTOR_HANDLE scratchedMetal =
-		d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_metal.png").c_str());
-
+	Assets& assets = Assets::GetInstance();
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
 	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	cobbleMat->AddTexture(cobblestoneAlbedo, 0);
-	cobbleMat->AddTexture(cobblestoneNormals, 1);
-	cobbleMat->AddTexture(cobblestoneRoughness, 2);
-	cobbleMat->AddTexture(cobblestoneMetal, 3);
+	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_albedo"), 0);
+	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_normals"), 1);
+	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_roughness"), 2);
+	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_metal"), 3);
 	cobbleMat->FinalizeMaterial();
 	materials.push_back(cobbleMat);
 
 	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	bronzeMat->AddTexture(bronzeAlbedo, 0);
-	bronzeMat->AddTexture(bronzeNormals, 1);
-	bronzeMat->AddTexture(bronzeRoughness, 2);
-	bronzeMat->AddTexture(bronzeMetal, 3);
+	bronzeMat->AddTexture(assets.GetTexture(L"Textures/PBR/bronze_albedo"), 0);
+	bronzeMat->AddTexture(assets.GetTexture(L"Textures/PBR/bronze_normals"), 1);
+	bronzeMat->AddTexture(assets.GetTexture(L"Textures/PBR/bronze_roughness"), 2);
+	bronzeMat->AddTexture(assets.GetTexture(L"Textures/PBR/bronze_metal"), 3);
 	bronzeMat->FinalizeMaterial();
 	materials.push_back(bronzeMat);
 
 	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	scratchedMat->AddTexture(scratchedAlbedo, 0);
-	scratchedMat->AddTexture(scratchedNormals, 1);
-	scratchedMat->AddTexture(scratchedRoughness, 2);
-	scratchedMat->AddTexture(scratchedMetal, 3);
+	scratchedMat->AddTexture(assets.GetTexture(L"Textures/PBR/scratched_albedo"), 0);
+	scratchedMat->AddTexture(assets.GetTexture(L"Textures/PBR/scratched_normals"), 1);
+	scratchedMat->AddTexture(assets.GetTexture(L"Textures/PBR/scratched_roughness"), 2);
+	scratchedMat->AddTexture(assets.GetTexture(L"Textures/PBR/scratched_metal"), 3);
 	scratchedMat->FinalizeMaterial();
 	materials.push_back(scratchedMat);
 }
 
 void Game::CreateBasicEntities()
 {
-	for (int i=0; i<meshes.size(); i++)
-	{
-		entities.push_back(std::make_shared<Entity>(meshes[i], materials[i % materials.size()]));
-	}
+	Assets& assets = Assets::GetInstance();
+	int i = 0;
+	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/sphere"), 
+		materials[i % materials.size()])); i++;
+	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/cube"),
+		materials[i % materials.size()])); i++;
+	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/helix"),
+		materials[i % materials.size()])); i++;
+	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/cylinder"),
+		materials[i % materials.size()])); i++;
+	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/torus"),
+		materials[i % materials.size()])); i++;
+	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Models/Pikachu(Gigantamax)"),
+		materials[i % materials.size()])); i++;
+
 	entities.back()->GetTransform()->SetScale(0.025f);
 	entities.back()->GetTransform()->SetRotation(XMFLOAT3(XM_PIDIV2, 0, 0));
 
-
-
-	entities.push_back(std::make_shared<Entity>(meshes[0], materials[0]));
+	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/sphere"),
+		materials[0]));
 	entities.back()->GetTransform()->SetScale(0.5f);
 	entities.back()->GetTransform()->SetParent(entities[0]->GetTransform().get(), true);
 }

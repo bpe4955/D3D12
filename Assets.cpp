@@ -84,15 +84,11 @@ void Assets::LoadAllAssets()
 			//else if (EndsWith(itemPath, L".spritefont"))
 			//{ LoadSpriteFont(itemPath); }
 			else if (EndsWith(itemPath, L".rootsig"))
-			{
-				LoadRootSig(itemPath);
-			}
+			{ LoadRootSig(itemPath); }
 			else if (EndsWith(itemPath, L".pipeline"))
-			{
-				pipelinePaths.push_back(itemPath);
-			}
-			//else if (EndsWith(itemPath, L".material"))
-			//{ materialPaths.push_back(itemPath); }
+			{ pipelinePaths.push_back(itemPath); }
+			else if (EndsWith(itemPath, L".material"))
+			{ materialPaths.push_back(itemPath); }
 		}
 	}
 
@@ -117,11 +113,11 @@ void Assets::LoadAllAssets()
 		LoadPipelineState(pPath);
 	}
 
-	//// Load all materials
-	//for (auto& mPath : materialPaths)
-	//{
-	//	LoadMaterial(mPath);
-	//}
+	// Load all materials
+	for (auto& mPath : materialPaths)
+	{
+		LoadMaterial(mPath);
+	}
 }
 //
 //	GETTERS
@@ -286,10 +282,35 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::GetPiplineState(std::wstring
 	// Unsuccessful
 	return 0;
 }
+std::shared_ptr<Material> Assets::GetMaterial(std::wstring name)
+{
+	// Search and return mesh if found
+	auto it = materials.find(name);
+	if (it != materials.end())
+		return it->second;
+
+	// Attempt to load on-demand?
+	if (allowOnDemandLoading)
+	{
+		// See if the file exists and attempt to load
+		std::wstring filePath = FixPath(rootAssetPath + name + L".material");
+		if (std::filesystem::exists(filePath))
+		{
+			// Do the load now and return the result
+			return LoadMaterial(filePath);
+		}
+	}
+
+	// Unsuccessful
+	return 0;
+}
 unsigned int Assets::GetMeshCount() { return (unsigned int)meshes.size(); }
 unsigned int Assets::GetTextureCount() { return (unsigned int)textures.size(); }
+unsigned int Assets::GetRootSigCount() { return (unsigned int)rootSigs.size(); }
+unsigned int Assets::GetPipelineStateCount() { return (unsigned int)pipelineStates.size(); }
 unsigned int Assets::GetPixelShaderCount() { return (unsigned int)pixelShaders.size(); }
 unsigned int Assets::GetVertexShaderCount() { return (unsigned int)vertexShaders.size(); }
+unsigned int Assets::GetMaterialCount() { return (unsigned int)materials.size(); }
 //
 //	MODIFIERS
 //
@@ -299,6 +320,7 @@ void Assets::AddRootSig(std::wstring name, Microsoft::WRL::ComPtr<ID3D12RootSign
 void Assets::AddPipelineState(std::wstring name, Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState) { pipelineStates.insert({ name, pipelineState }); }
 void Assets::AddPixelShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> ps) { pixelShaders.insert({ name, ps }); }
 void Assets::AddVertexShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> vs) { vertexShaders.insert({ name, vs }); }
+void Assets::AddMaterial(std::wstring name, std::shared_ptr<Material> material) { materials.insert({ name, material }); }
 //
 //	PRIVATE LOADING FUNCTIONS
 //
@@ -885,6 +907,103 @@ Microsoft::WRL::ComPtr<ID3DBlob> Assets::LoadVertexShader(std::wstring path)
 	// Success
 	vertexShaders.insert({ filename, vs });
 	return vs;
+}
+
+std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
+{
+	// Strip out everything before and including the asset root path
+	size_t assetPathLength = rootAssetPath.size();
+	size_t assetPathPosition = path.rfind(rootAssetPath);
+	std::wstring filename = path.substr(assetPathPosition + assetPathLength);
+
+	if (printLoadingProgress)
+	{
+		printf("Loading material: ");
+		wprintf(filename.c_str());
+		printf("\n");
+	}
+
+	// Open the file and parse
+	std::ifstream file(path);
+	json d = json::parse(file);
+	file.close();
+
+	// Remove the file extension the end of the filename before using as a key
+	filename = RemoveFileExtension(filename);
+
+	// Verify required members (pipeline for now)
+	if (d.is_discarded() ||
+		!d.contains("pipeline") )
+	{
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = GetPiplineState(L"PipelineStates/BasicPipelineState");
+		std::shared_ptr<Material> matInvalid = std::make_shared<Material>(pipelineState); // TODO: Default shaders?
+		AddMaterial(filename, matInvalid);
+		return matInvalid;
+	}
+
+	// Check to see if the requested pipeline state
+	std::wstring psName = NarrowToWide(d["pipeline"].get<std::string>());
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = GetPiplineState(psName);
+
+	// We have enough to make the material
+	std::shared_ptr<Material> mat = std::make_shared<Material>(pipelineState);
+
+	// Check for 3-component tint
+	if (d.contains("tint") && d["tint"].size() == 3)
+	{
+		DirectX::XMFLOAT3 tint(0, 0, 0);
+		tint.x = d["tint"][0].get<float>();
+		tint.y = d["tint"][1].get<float>();
+		tint.z = d["tint"][2].get<float>();
+		mat->SetColorTint(tint);
+	}
+
+	// 2-component uvScale
+	if (d.contains("uvScale") && d["uvScale"].size() == 2)
+	{
+		DirectX::XMFLOAT2 uvScale(0, 0);
+		uvScale.x = d["uvScale"][0].get<float>();
+		uvScale.y = d["uvScale"][1].get<float>();
+		mat->SetUVScale(uvScale);
+	}
+
+	// 2-component uvOffset
+	if (d.contains("uvOffset") && d["uvOffset"].size() == 2)
+	{
+		DirectX::XMFLOAT2 uvOffset(0, 0);
+		uvOffset.x = d["uvOffset"][0].get<float>();
+		uvOffset.y = d["uvOffset"][1].get<float>();
+		mat->SetUVOffset(uvOffset);
+	}
+
+	// Check for textures
+	if (d.contains("textures"))
+	{
+		for (unsigned int t = 0; t < d["textures"].size(); t++)
+		{
+			// Do we know about this texture?
+			std::wstring textureName = NarrowToWide(d["textures"][t]["name"].get<std::string>());
+			D3D12_CPU_DESCRIPTOR_HANDLE texture = GetTexture(textureName);
+
+			std::string textureType = d["textures"][t]["type"].get<std::string>();
+			std::transform(textureType.begin(), textureType.end(), textureType.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (textureType == "ALBEDO")
+			{ mat->AddTexture(texture, 0); }
+			else if (textureType == "NORMALS" || textureType == "NORMAL")
+			{ mat->AddTexture(texture, 1); }
+			else if (textureType == "ROUGHNESS" || textureType == "ROUGH")
+			{ mat->AddTexture(texture, 2); }
+			else if (textureType == "METAL" || textureType == "METALNESS")
+			{ mat->AddTexture(texture, 3); }
+		}
+	}
+
+	// Add the material to our list and return it
+	mat->FinalizeMaterial();
+	materials.insert({ filename, mat });
+	return mat;
 }
 
 

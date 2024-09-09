@@ -71,64 +71,13 @@ void Game::LoadAssets()
 
 void Game::CreateBasicMaterials()
 {
-	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
-
-	// Load textures
-	//D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneAlbedo = 
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_albedo.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneNormals =
-	//	d3d12Helper.LoadTexture(FixPath(L"/../../Assets/Textures/PBR/cobblestone_normals.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneRoughness =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_roughness.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE cobblestoneMetal =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/cobblestone_metal.png").c_str());
-	//
-	//D3D12_CPU_DESCRIPTOR_HANDLE bronzeAlbedo =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_albedo.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE bronzeNormals =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_normals.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE bronzeRoughness =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_roughness.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE bronzeMetal =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/bronze_metal.png").c_str());
-	//
-	//D3D12_CPU_DESCRIPTOR_HANDLE scratchedAlbedo =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_albedo.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE scratchedNormals =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_normals.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE scratchedRoughness =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_roughness.png").c_str());
-	//D3D12_CPU_DESCRIPTOR_HANDLE scratchedMetal =
-	//	d3d12Helper.LoadTexture(FixPath(L"../../Assets/Textures/PBR/scratched_metal.png").c_str());
-
 	Assets& assets = Assets::GetInstance();
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = assets.GetPiplineState(L"PipelineStates/BasicCullNone");
-	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_albedo"), 0);
-	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_normals"), 1);
-	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_roughness"), 2);
-	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_metal"), 3);
-	cobbleMat->FinalizeMaterial();
-	materials.push_back(cobbleMat);
-
-	std::shared_ptr<Material> bronzeMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	bronzeMat->AddTexture(assets.GetTexture(L"Textures/PBR/bronze_albedo"), 0);
-	bronzeMat->AddTexture(assets.GetTexture(L"Textures/PBR/bronze_normals"), 1);
-	bronzeMat->AddTexture(assets.GetTexture(L"Textures/PBR/bronze_roughness"), 2);
-	bronzeMat->AddTexture(assets.GetTexture(L"Textures/PBR/bronze_metal"), 3);
-	bronzeMat->FinalizeMaterial();
-	materials.push_back(bronzeMat);
-
-	std::shared_ptr<Material> scratchedMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
-	scratchedMat->AddTexture(assets.GetTexture(L"Textures/PBR/scratched_albedo"), 0);
-	scratchedMat->AddTexture(assets.GetTexture(L"Textures/PBR/scratched_normals"), 1);
-	scratchedMat->AddTexture(assets.GetTexture(L"Textures/PBR/scratched_roughness"), 2);
-	scratchedMat->AddTexture(assets.GetTexture(L"Textures/PBR/scratched_metal"), 3);
-	scratchedMat->FinalizeMaterial();
-	materials.push_back(scratchedMat);
+	materials.push_back(assets.GetMaterial(L"Materials/cobblestone"));
+	materials.push_back(assets.GetMaterial(L"Materials/bronze"));
+	materials.push_back(assets.GetMaterial(L"Materials/scratched"));
 }
 
 void Game::CreateBasicEntities()

@@ -1,0 +1,29 @@
+{
+    "pipeline" : "PipelineStates/BasicCullNone",
+    "tint": [1.0, 1.0, 1.0],
+    "uvScale": [1.0, 1.0],
+    "uvOffset": [0.0, 0.0],
+    "samplers": [{
+    "name": "Samplers/anisotropic16Wrap",
+    "shaderName": "BasicSampler"
+    }],
+    "textures" : 
+    [
+        {
+            "name" : "Textures/PBR/cobblestone_albedo",
+            "type" : "ALBEDO"
+        },
+        {
+            "name" : "Textures/PBR/cobblestone_normals",
+            "type" : "NORMALS"
+        },
+        {
+            "name" : "Textures/PBR/cobblestone_roughness",
+            "type" : "ROUGHNESS"
+        },
+        {
+            "name" : "Textures/PBR/cobblestone_metal",
+            "type" : "METAL"
+        }
+    ]
+}

@@ -10,6 +10,7 @@
 #include <SpriteFont.h>
 
 #include "Mesh.h"
+#include "Material.h"
 
 
 class Assets
@@ -52,29 +53,31 @@ public:
 	// Getters
 	std::shared_ptr<Mesh> GetMesh(std::wstring name);
 	D3D12_CPU_DESCRIPTOR_HANDLE GetTexture(std::wstring name);
-	//std::shared_ptr<Material> GetMaterial(std::wstring name);
 	//std::shared_ptr<DirectX::SpriteFont> GetSpriteFont(std::wstring name);
 	Microsoft::WRL::ComPtr<ID3DBlob> GetPixelShader(std::wstring name);
 	Microsoft::WRL::ComPtr<ID3DBlob> GetVertexShader(std::wstring name);
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSig(std::wstring name);
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPiplineState(std::wstring name);
+	std::shared_ptr<Material> GetMaterial(std::wstring name);
 	unsigned int GetMeshCount();
 	unsigned int GetTextureCount();
-	//unsigned int GetMaterialCount();
+	unsigned int GetRootSigCount();
+	unsigned int GetPipelineStateCount();
 	//unsigned int GetSpriteFontCount();
 	//unsigned int GetSamplerCount();
 	unsigned int GetPixelShaderCount();
 	unsigned int GetVertexShaderCount();
+	unsigned int GetMaterialCount();
 
 	// Modifiers
 	void AddMesh(std::wstring name, std::shared_ptr<Mesh> mesh);
 	void AddTexture(std::wstring name, D3D12_CPU_DESCRIPTOR_HANDLE texture);
-	//void AddMaterial(std::wstring name, std::shared_ptr<Material> material);
 	//void AddSpriteFont(std::wstring name, std::shared_ptr<DirectX::SpriteFont> font);
 	void AddRootSig(std::wstring name, Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig);
 	void AddPipelineState(std::wstring name, Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState);
 	void AddPixelShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> ps);
 	void AddVertexShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> vs);
+	void AddMaterial(std::wstring name, std::shared_ptr<Material> material);
 
 
 private:
@@ -87,7 +90,6 @@ private:
 
 	std::unordered_map<std::wstring, std::shared_ptr<Mesh>> meshes;
 	std::unordered_map<std::wstring, D3D12_CPU_DESCRIPTOR_HANDLE> textures;
-	//std::unordered_map<std::wstring, std::shared_ptr<Material>> materials;
 	//std::unordered_map<std::wstring, std::shared_ptr<DirectX::SpriteFont>> spriteFonts;
 	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3D12RootSignature>> rootSigs;
 	bool inputElementsCreated = false;
@@ -96,6 +98,7 @@ private:
 	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3D12PipelineState>> pipelineStates;
 	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3DBlob>> pixelShaders;
 	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3DBlob>> vertexShaders;
+	std::unordered_map<std::wstring, std::shared_ptr<Material>> materials;
 
 	///
 	/// Loading Functions
@@ -107,10 +110,10 @@ private:
 	//std::shared_ptr<DirectX::SpriteFont> LoadSpriteFont(std::wstring path);
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> LoadRootSig(std::wstring path);
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> LoadPipelineState(std::wstring path);
-	//std::shared_ptr<Material> LoadMaterial(std::wstring path);
 	void LoadUnknownShader(std::wstring path);
 	Microsoft::WRL::ComPtr<ID3DBlob> LoadPixelShader(std::wstring path);
 	Microsoft::WRL::ComPtr<ID3DBlob> LoadVertexShader(std::wstring path);
+	std::shared_ptr<Material> LoadMaterial(std::wstring path);
 
 	/// Helpers for determining the actual path to the executable
 	/// Written By vixorien https://github.dev/vixorien/ggp-advanced-demos

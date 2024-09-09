@@ -3,7 +3,8 @@
 #include <memory>
 
 #include "Transform.h"
-//#include "../../Common/json/json.hpp"
+#include "nlohmann/json.hpp"
+
 
 enum class CameraProjectionType
 {
@@ -68,7 +69,7 @@ public:
 	CameraProjectionType GetProjectionType();
 	void SetProjectionType(CameraProjectionType type);
 
-	//static std::shared_ptr<Camera> Parse(nlohmann::json jsonCamera);
+	static std::shared_ptr<Camera> Parse(nlohmann::json jsonCamera);
 
 private:
 	// Camera matrices

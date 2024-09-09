@@ -10,6 +10,10 @@
 #include <codecvt>
 #include <d3dcompiler.h>
 
+#include <fstream>
+#include "nlohmann/json.hpp"
+#include "Graphics.h"
+using json = nlohmann::json;
 
 // Singleton requirement
 Assets* Assets::instance;
@@ -23,21 +27,25 @@ Assets::~Assets()
 {
 }
 
-void Assets::Initialize(std::wstring _rootAssetPath,
+void Assets::Initialize(std::wstring _rootAssetPath, std::wstring _rootShaderPath,
 	Microsoft::WRL::ComPtr<ID3D12Device> _device, bool _printLoadingProgress,
 	bool _allowOnDemandLoading)
 {
 	rootAssetPath = _rootAssetPath;
+	rootShaderPath = _rootShaderPath;
 	device = _device;
 	printLoadingProgress = _printLoadingProgress;
 	allowOnDemandLoading = _allowOnDemandLoading;
 
 	// Replace all "\\" with "/" to ease lookup later
 	std::replace(this->rootAssetPath.begin(), this->rootAssetPath.end(), '\\', '/');
+	std::replace(this->rootShaderPath.begin(), this->rootShaderPath.end(), '\\', '/');
 
 	// Ensure the root path ends with a slash
 	if (!EndsWith(rootAssetPath, L"/"))
 		rootAssetPath += L"/";
+	if (!EndsWith(rootShaderPath, L"/"))
+		rootShaderPath += L"/";
 
 	if (!allowOnDemandLoading) { LoadAllAssets(); }
 }
@@ -45,8 +53,10 @@ void Assets::Initialize(std::wstring _rootAssetPath,
 void Assets::LoadAllAssets()
 {
 	if (rootAssetPath.empty()) return;
+	if (rootShaderPath.empty()) return;
 
 	// These files need to be loaded after all basic assets
+	std::vector<std::wstring> pipelinePaths;
 	std::vector<std::wstring> materialPaths;
 
 	// Recursively go through all directories starting at the root
@@ -62,30 +72,56 @@ void Assets::LoadAllAssets()
 
 			// Determine the file type
 			if (EndsWith(itemPath, L".obj") || EndsWith(itemPath, L".fbx") || EndsWith(itemPath, L".dae"))
-			{ LoadMesh(itemPath); }
+			{
+				LoadMesh(itemPath);
+			}
 			else if (EndsWith(itemPath, L".jpg") || EndsWith(itemPath, L".png"))
-			{ LoadTexture(itemPath); }
+			{
+				LoadTexture(itemPath);
+			}
 			//else if (EndsWith(itemPath, L".dds"))
 			//{ LoadDDSTexture(itemPath); }
 			//else if (EndsWith(itemPath, L".spritefont"))
 			//{ LoadSpriteFont(itemPath); }
-			//else if (EndsWith(itemPath, L".sampler"))
-			//{ LoadSampler(itemPath); }
+			else if (EndsWith(itemPath, L".rootsig"))
+			{
+				LoadRootSig(itemPath);
+			}
+			else if (EndsWith(itemPath, L".pipeline"))
+			{
+				pipelinePaths.push_back(itemPath);
+			}
 			//else if (EndsWith(itemPath, L".material"))
 			//{ materialPaths.push_back(itemPath); }
 		}
 	}
 
-	// Search and load all shaders in the exe directory
-	for (auto& item : std::filesystem::directory_iterator(GetFullPathTo(".")))
+	// Search and load all shaders in the shader path
+	for (auto& item : std::filesystem::directory_iterator(FixPath(rootShaderPath)))
 	{
-		// Assume we're just using the filename for shaders due to being in the .exe path
-		std::wstring itemPath = item.path().filename().wstring();
+		std::wstring itemPath = item.path().wstring();
+
+		// Replace all L"\\" with L"/" to ease lookup later
+		std::replace(itemPath.begin(), itemPath.end(), '\\', '/');
 
 		// Is this a Compiled Shader Object?
 		if (EndsWith(itemPath, L".cso"))
-		{ LoadUnknownShader(itemPath); }
+		{
+			LoadUnknownShader(itemPath);
+		}
 	}
+
+	// Load all pipelineStates
+	for (auto& pPath : pipelinePaths)
+	{
+		LoadPipelineState(pPath);
+	}
+
+	//// Load all materials
+	//for (auto& mPath : materialPaths)
+	//{
+	//	LoadMaterial(mPath);
+	//}
 }
 //
 //	GETTERS
@@ -113,8 +149,10 @@ std::shared_ptr<Mesh> Assets::GetMesh(std::wstring name)
 	{
 		// Is it a JPG?
 		std::wstring filePathOBJ = FixPath(rootAssetPath + name + L".obj");
-		if (std::filesystem::exists(filePathOBJ)) 
-		{ return LoadMesh(filePathOBJ); }
+		if (std::filesystem::exists(filePathOBJ))
+		{
+			return LoadMesh(filePathOBJ);
+		}
 		// Is it a FBX?
 		std::wstring filePathFBX = FixPath(rootAssetPath + name + L".fbx");
 		if (std::filesystem::exists(filePathFBX)) { return LoadMesh(filePathFBX); }
@@ -164,7 +202,7 @@ Microsoft::WRL::ComPtr<ID3DBlob> Assets::GetPixelShader(std::wstring name)
 	{
 		// See if the file exists and attempt to load
 		// Assume root path is same as .exe
-		std::wstring filePath = FixPath(name + L".cso");
+		std::wstring filePath = FixPath(rootShaderPath + name + L".cso");
 		if (std::filesystem::exists(filePath))
 		{
 			// Attempt to load the pixel shader and return it if successful
@@ -188,12 +226,60 @@ Microsoft::WRL::ComPtr<ID3DBlob> Assets::GetVertexShader(std::wstring name)
 	{
 		// See if the file exists and attempt to load
 		// Assume root path is same as .exe
-		std::wstring filePath = FixPath(name + L".cso");
+		std::wstring filePath = FixPath(rootShaderPath + name + L".cso");
 		if (std::filesystem::exists(filePath))
 		{
 			// Attempt to load the pixel shader and return it if successful
 			Microsoft::WRL::ComPtr<ID3DBlob> vs = LoadVertexShader(filePath);
-			if (vs) { return vs; }
+			return vs;
+		}
+	}
+
+	// Unsuccessful
+	return 0;
+}
+Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::GetRootSig(std::wstring name)
+{
+	// Search and return shader if found
+	auto it = rootSigs.find(name);
+	if (it != rootSigs.end())
+		return it->second;
+
+	// Attempt to load on-demand?
+	if (allowOnDemandLoading)
+	{
+		// See if the file exists and attempt to load
+		// Assume root path is same as .exe
+		std::wstring filePath = FixPath(rootAssetPath + name + L".rootsig");
+		if (std::filesystem::exists(filePath))
+		{
+			// Attempt to load the root signature and return it if successful
+			Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig = LoadRootSig(filePath);
+			return rootSig;
+		}
+	}
+
+	// Unsuccessful
+	return 0;
+}
+Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::GetPiplineState(std::wstring name)
+{
+	// Search and return shader if found
+	auto it = pipelineStates.find(name);
+	if (it != pipelineStates.end())
+		return it->second;
+
+	// Attempt to load on-demand?
+	if (allowOnDemandLoading)
+	{
+		// See if the file exists and attempt to load
+		// Assume root path is same as .exe
+		std::wstring filePath = FixPath(rootAssetPath + name + L".pipeline");
+		if (std::filesystem::exists(filePath))
+		{
+			// Attempt to load the pipeline state and return it if successful
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = LoadPipelineState(filePath);
+			return pipelineState;
 		}
 	}
 
@@ -207,14 +293,12 @@ unsigned int Assets::GetVertexShaderCount() { return (unsigned int)vertexShaders
 //
 //	MODIFIERS
 //
-void Assets::AddMesh(std::wstring name, std::shared_ptr<Mesh> mesh)
-{ meshes.insert({ name, mesh }); }
-void Assets::AddTexture(std::wstring name, D3D12_CPU_DESCRIPTOR_HANDLE texture)
-{ textures.insert({ name, texture }); }
-void Assets::AddPixelShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> ps)
-{ pixelShaders.insert({ name, ps }); }
-void Assets::AddVertexShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> vs)
-{ vertexShaders.insert({ name, vs }); }
+void Assets::AddMesh(std::wstring name, std::shared_ptr<Mesh> mesh) { meshes.insert({ name, mesh }); }
+void Assets::AddTexture(std::wstring name, D3D12_CPU_DESCRIPTOR_HANDLE texture) { textures.insert({ name, texture }); }
+void Assets::AddRootSig(std::wstring name, Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig) { rootSigs.insert({ name, rootSig }); }
+void Assets::AddPipelineState(std::wstring name, Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState) { pipelineStates.insert({ name, pipelineState }); }
+void Assets::AddPixelShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> ps) { pixelShaders.insert({ name, ps }); }
+void Assets::AddVertexShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> vs) { vertexShaders.insert({ name, vs }); }
 //
 //	PRIVATE LOADING FUNCTIONS
 //
@@ -283,11 +367,456 @@ D3D12_CPU_DESCRIPTOR_HANDLE Assets::LoadTexture(std::wstring path)
 //{
 //}
 
+Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring path)
+{
+	// Strip out everything before and including the asset root path
+	size_t assetPathLength = rootAssetPath.size();
+	size_t assetPathPosition = path.rfind(rootAssetPath);
+	std::wstring filename = path.substr(assetPathPosition + assetPathLength);
+
+	if (printLoadingProgress)
+	{
+		printf("Loading root signature: ");
+		wprintf(filename.c_str());
+		printf("\n");
+	}
+
+	// Open the file and parse
+	std::ifstream file(path);
+	json d = json::parse(file);
+	file.close();
+
+	// Remove the file extension the end of the filename before using as a key
+	filename = RemoveFileExtension(filename);
+
+	if (d.is_discarded())
+	{
+		// Set a null root signature
+		rootSigs.insert({ filename, 0 });
+		return 0;
+	}
+
+	// Root Signature
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
+	// Describe the range of CBVs needed for the vertex shader
+	D3D12_DESCRIPTOR_RANGE cbvRangeVS = {};
+	cbvRangeVS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	cbvRangeVS.NumDescriptors = 1;
+	cbvRangeVS.BaseShaderRegister = 0;
+	cbvRangeVS.RegisterSpace = 0;
+	cbvRangeVS.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	// Describe the range of CBVs needed for the pixel shader
+	D3D12_DESCRIPTOR_RANGE cbvRangePS = {};
+	cbvRangePS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	cbvRangePS.NumDescriptors = 1;
+	cbvRangePS.BaseShaderRegister = 0;
+	cbvRangePS.RegisterSpace = 0;
+	cbvRangePS.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	UINT numDescriptors = 4;
+	UINT baseShaderRegister = 0;
+	if (d.contains("numTextures")) { numDescriptors = d["numTextures"].get<unsigned int>(); }
+	if (d.contains("baseShaderRegister")) { baseShaderRegister = d["baseShaderRegister"].get<unsigned int>(); }
+	// Create a range of SRV's for textures
+	D3D12_DESCRIPTOR_RANGE srvRange = {};
+	srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	srvRange.NumDescriptors = numDescriptors; // Set to max number of textures at once (match pixel shader!)
+	srvRange.BaseShaderRegister = baseShaderRegister; // Starts at s0 (match pixel shader!)
+	srvRange.RegisterSpace = 0;
+	srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	// Create the root parameters
+	D3D12_ROOT_PARAMETER rootParams[3] = {};
+	// CBV table param for vertex shader
+	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[0].DescriptorTable.pDescriptorRanges = &cbvRangeVS;
+	// CBV table param for pixel shader
+	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[1].DescriptorTable.pDescriptorRanges = &cbvRangePS;
+	// SRV table param
+	rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[2].DescriptorTable.pDescriptorRanges = &srvRange;
+
+	// Create a single static sampler (available to all pixel shaders at the same slot)
+	D3D12_TEXTURE_ADDRESS_MODE u = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	D3D12_TEXTURE_ADDRESS_MODE v = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	D3D12_TEXTURE_ADDRESS_MODE w = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	D3D12_FILTER filter = D3D12_FILTER_ANISOTROPIC;
+	D3D12_STATIC_BORDER_COLOR borderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	D3D12_COMPARISON_FUNC compFunc = D3D12_COMPARISON_FUNC_NEVER;
+	UINT maxAnisotropy = 16;
+	// WRAP   - 1  |  MIRROR      - 2  |  CLAMP - 3
+	// BORDER - 4  |  MORROR_ONCE - 5  
+	if (d.contains("sampler"))
+	{
+		if (d["sampler"].contains("u") && d["sampler"]["u"].is_number_integer())
+		{
+			u = d["sampler"]["u"].get<D3D12_TEXTURE_ADDRESS_MODE>();
+		}
+		if (d["sampler"].contains("v") && d["sampler"]["v"].is_number_integer())
+		{
+			v = d["sampler"]["v"].get<D3D12_TEXTURE_ADDRESS_MODE>();
+		}
+		if (d["sampler"].contains("w") && d["sampler"]["w"].is_number_integer())
+		{
+			w = d["sampler"]["w"].get<D3D12_TEXTURE_ADDRESS_MODE>();
+		}
+		if (d["sampler"].contains("filter") && d["sampler"]["filter"].is_string())
+		{
+			//d["sampler"]["filter"].get<std::string>()
+			auto input = d["sampler"]["filter"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "ANISOTROPIC")
+			{ filter = D3D12_FILTER_ANISOTROPIC; }
+			else if (input == "COMPARISON_ANISOTROPIC" || input == "COMPARISONANISOTROPIC")
+			{ filter = D3D12_FILTER_COMPARISON_ANISOTROPIC; }
+			else if (input == "MIN_MAG_MIP_LINEAR" || input == "LINEAR")
+			{ filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR; }
+			else if (input == "MIN_MAG_MIP_POINT" || input == "POINT")
+			{ filter = D3D12_FILTER_MIN_MAG_MIP_POINT; }
+			else if (input == "COMPARISON_MIN_MAG_MIP_LINEAR" || input == "COMPARISONANLINEAR")
+			{ filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR; }
+			else if (input == "COMPARISON_MIN_MAG_MIP_POINT" || input == "COMPARISONANPOINT")
+			{ filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT; }
+			else if (input == "MINIMUM_MIN_MAG_MIP_LINEAR")
+			{ filter = D3D12_FILTER_MINIMUM_MIN_MAG_MIP_LINEAR; }
+			else if (input == "MINIMUM_MIN_MAG_MIP_POINT")
+			{ filter = D3D12_FILTER_MINIMUM_MIN_MAG_MIP_POINT; }
+			else if (input == "MAXIMUM_MIN_MAG_MIP_LINEAR")
+			{ filter = D3D12_FILTER_MAXIMUM_MIN_MAG_MIP_LINEAR; }
+			else if (input == "MAXIMUM_MIN_MAG_MIP_POINT")
+			{ filter = D3D12_FILTER_MAXIMUM_MIN_MAG_MIP_POINT; }
+		}
+		if (d["sampler"].contains("borderColor") && d["sampler"]["borderColor"].is_string())
+		{
+			//d["sampler"]["filter"].get<std::string>()
+			auto input = d["sampler"]["borderColor"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "TRANSPARENT_BLACK" || input == "TRANSPARENT")
+			{ borderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK; }
+			else if (input == "OPAQUE_BLACK" || input == "BLACK")
+			{ borderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK; }
+			else if (input == "OPAQUE_WHITE" || input == "WHITE")
+			{ borderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE; }
+		}
+		if (d["sampler"].contains("comparison") && d["sampler"]["comparison"].is_string())
+		{
+			//d["sampler"]["filter"].get<std::string>()
+			auto input = d["sampler"]["comparison"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "NEVER") { compFunc = D3D12_COMPARISON_FUNC_NEVER; }
+			else if (input == "LESS") { compFunc = D3D12_COMPARISON_FUNC_LESS; }
+			else if (input == "EQUAL") { compFunc = D3D12_COMPARISON_FUNC_EQUAL; }
+			else if (input == "LESS_EQUAL" || input == "LESSEQUAL") { compFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL; }
+			else if (input == "GREATER") { compFunc = D3D12_COMPARISON_FUNC_GREATER; }
+			else if (input == "NOT_EQUAL" || input == "NOTEQUAL") { compFunc = D3D12_COMPARISON_FUNC_NOT_EQUAL; }
+			else if (input == "GREATER_EQUAL" || input == "GREATEREQUAL") { compFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL; }
+			else if (input == "ALWAYS") { compFunc = D3D12_COMPARISON_FUNC_ALWAYS; }
+		}
+		if (d["sampler"].contains("maxAnisotropy") && d["sampler"]["maxAnisotropy"].is_number_integer())
+		{
+			maxAnisotropy = d["sampler"]["maxAnisotropy"].get<unsigned int>();
+		}
+	}
+
+
+	D3D12_STATIC_SAMPLER_DESC sampDesc = {};
+	sampDesc.AddressU = u;
+	sampDesc.AddressV = v;
+	sampDesc.AddressW = w;
+	sampDesc.Filter = filter;
+	sampDesc.MaxAnisotropy = maxAnisotropy;
+	sampDesc.BorderColor = borderColor;
+	sampDesc.MaxLOD = D3D12_FLOAT32_MAX;
+	sampDesc.ShaderRegister = 0; // register(s0)
+	sampDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	sampDesc.ComparisonFunc = compFunc;
+
+	D3D12_STATIC_SAMPLER_DESC samplers[] = { sampDesc };
+	// Describe the root signature
+	D3D12_ROOT_SIGNATURE_DESC rootSig = {};
+	rootSig.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	rootSig.NumParameters = ARRAYSIZE(rootParams);
+	rootSig.pParameters = rootParams;
+	rootSig.NumStaticSamplers = ARRAYSIZE(samplers);
+	rootSig.pStaticSamplers = samplers;
+
+	// Serialze the root signature
+	ID3DBlob* serializedRootSig = 0;
+	ID3DBlob* errors = 0;
+	D3D12SerializeRootSignature(
+		&rootSig,
+		D3D_ROOT_SIGNATURE_VERSION_1,
+		&serializedRootSig,
+		&errors);
+
+	// Check for errors during serialization
+	if (errors != 0)
+	{
+		OutputDebugString((wchar_t*)errors->GetBufferPointer());
+	}
+
+
+	// Actually create the root sig
+	Graphics::Device->CreateRootSignature(
+		0,
+		serializedRootSig->GetBufferPointer(),
+		serializedRootSig->GetBufferSize(),
+		IID_PPV_ARGS(rootSignature.GetAddressOf()));
+
+	rootSigs.insert({ filename, rootSignature });
+
+	return rootSignature;
+}
+
+Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstring path)
+{
+	// Strip out everything before and including the asset root path
+	size_t assetPathLength = rootAssetPath.size();
+	size_t assetPathPosition = path.rfind(rootAssetPath);
+	std::wstring filename = path.substr(assetPathPosition + assetPathLength);
+
+	if (printLoadingProgress)
+	{
+		printf("Loading pipeline state: ");
+		wprintf(filename.c_str());
+		printf("\n");
+	}
+
+	// Open the file and parse
+	std::ifstream file(path);
+	json d = json::parse(file);
+	file.close();
+
+	// Remove the file extension the end of the filename before using as a key
+	filename = RemoveFileExtension(filename);
+
+	// Verify required members (shaders for now)
+	if (d.is_discarded() ||
+		!d.contains("shaders") ||
+		!d["shaders"].contains("pixel") ||
+		!d["shaders"].contains("vertex") ||
+		!d.contains("rootSig"))
+	{
+		// Set a null root signature
+		rootSigs.insert({ filename, 0 });
+		return 0;
+	}
+
+	// Load Shaders
+	std::wstring vsName = NarrowToWide(d["shaders"]["vertex"].get<std::string>());
+	std::wstring psName = NarrowToWide(d["shaders"]["pixel"].get<std::string>());
+	Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderByteCode = GetVertexShader(vsName);
+	Microsoft::WRL::ComPtr<ID3DBlob> pixelShaderByteCode = GetPixelShader(psName);
+
+	// Load Root Sig
+	std::wstring rootSigName = NarrowToWide(d["rootSig"].get<std::string>());
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = GetRootSig(rootSigName);
+
+	// Input layout - Always the same
+	if( !inputElementsCreated )
+	{
+		// Create an input layout that describes the vertex format
+		// used by the vertex shader we're using
+		//  - This is used by the pipeline to know how to interpret the raw data
+		//     sitting inside a vertex buffer
+
+		// Set up the first element - a position, which is 3 float values
+		inputElements[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT; // How far into the vertex is this?  Assume it's after the previous element
+		inputElements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// Most formats are described as color channels, really it just means "Three 32-bit floats"
+		inputElements[0].SemanticName = "POSITION";					// This is "POSITION" - needs to match the semantics in our vertex shader input!
+		inputElements[0].SemanticIndex = 0;							// This is the 0th position (there could be more)
+
+		// Set up the second element - a UV, which is 2 more float values
+		inputElements[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[1].Format = DXGI_FORMAT_R32G32_FLOAT;			// 2x 32-bit floats
+		inputElements[1].SemanticName = "TEXCOORD";					// Match our vertex shader input!
+		inputElements[1].SemanticIndex = 0;							// This is the 0th uv (there could be more)
+
+		// Set up the third element - a normal, which is 3 more float values
+		inputElements[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
+		inputElements[2].SemanticName = "NORMAL";					// Match our vertex shader input!
+		inputElements[2].SemanticIndex = 0;							// This is the 0th normal (there could be more)
+
+		// Set up the fourth element - a tangent, which is 2 more float values
+		inputElements[3].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
+		inputElements[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
+		inputElements[3].SemanticName = "TANGENT";					// Match our vertex shader input!
+		inputElements[3].SemanticIndex = 0;							// This is the 0th tangent (there could be more)
+	
+		inputElementsCreated = true;
+	}
+
+	//
+	// Load in data for Pipeline State
+	//
+	// IA
+	D3D12_PRIMITIVE_TOPOLOGY_TYPE topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	if (d.contains("topology") && d["topology"].is_string())
+	{
+		auto input = d["topology"].get<std::string>();
+		std::transform(input.begin(), input.end(), input.begin(),
+			[](unsigned char c) { return std::toupper(c); });
+
+		if (input == "TRIANGLE") { topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; }
+		else if (input == "POINT") { topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT; }
+		else if (input == "LINE") { topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE; }
+		else if (input == "PATCH") { topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH; }
+	}
+
+	// RS
+	D3D12_FILL_MODE fillMode = D3D12_FILL_MODE_SOLID;
+	D3D12_CULL_MODE cullMode = D3D12_CULL_MODE_BACK;
+	bool depthClipEnable = true;
+	if (d.contains("rasterizer"))
+	{
+		if (d["rasterizer"].contains("fill") && d["rasterizer"]["fill"].is_string())
+		{
+			auto input = d["rasterizer"]["fill"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "SOLID") { fillMode = D3D12_FILL_MODE_SOLID; }
+			else if (input == "WIREFRAME") { fillMode = D3D12_FILL_MODE_WIREFRAME; }
+		}
+		if (d["rasterizer"].contains("cull") && d["rasterizer"]["cull"].is_string())
+		{
+			auto input = d["rasterizer"]["cull"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "BACK") { cullMode = D3D12_CULL_MODE_BACK; }
+			else if (input == "NONE") { cullMode = D3D12_CULL_MODE_NONE; }
+			else if (input == "FRONT") { cullMode = D3D12_CULL_MODE_FRONT; }
+		}
+		if (d["rasterizer"].contains("depthClip") && d["rasterizer"]["depthClip"].is_string())
+		{
+			auto input = d["rasterizer"]["depthClip"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "FALSE" || input == "0") { depthClipEnable = false; }
+		}
+	}
+
+	// Depth Stencil
+	bool depthEnable = true;
+	D3D12_COMPARISON_FUNC compFunc = D3D12_COMPARISON_FUNC_LESS;
+	D3D12_DEPTH_WRITE_MASK depthWrite = D3D12_DEPTH_WRITE_MASK_ALL;
+	if (d.contains("depthStencil"))
+	{
+		if (d["depthStencil"].contains("depthEnable") && d["depthStencil"]["depthEnable"].is_string())
+		{
+			std::string input = d["depthStencil"]["depthEnable"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "FALSE" || input == "0") { depthEnable = false; }
+			else { depthEnable = true; }
+		}
+		if (d["depthStencil"].contains("comparison") && d["depthStencil"]["comparison"].is_string())
+		{
+			auto input = d["depthStencil"]["comparison"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "NEVER") { compFunc = D3D12_COMPARISON_FUNC_NEVER; }
+			else if (input == "LESS") { compFunc = D3D12_COMPARISON_FUNC_LESS; }
+			else if (input == "EQUAL") { compFunc = D3D12_COMPARISON_FUNC_EQUAL; }
+			else if (input == "LESS_EQUAL" || input == "LESSEQUAL") { compFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL; }
+			else if (input == "GREATER") { compFunc = D3D12_COMPARISON_FUNC_GREATER; }
+			else if (input == "NOT_EQUAL" || input == "NOTEQUAL") { compFunc = D3D12_COMPARISON_FUNC_NOT_EQUAL; }
+			else if (input == "GREATER_EQUAL" || input == "GREATEREQUAL") { compFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL; }
+			else if (input == "ALWAYS") { compFunc = D3D12_COMPARISON_FUNC_ALWAYS; }
+		}
+		if (d["depthStencil"].contains("write") && d["depthStencil"]["write"].is_string())
+		{
+			std::string input = d["depthStencil"]["write"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "ZERO" || input == "FALSE" || input == "0") { depthWrite = D3D12_DEPTH_WRITE_MASK_ZERO; }
+			else { depthWrite = D3D12_DEPTH_WRITE_MASK_ALL; }
+		}
+	}
+
+	// Blend State
+	D3D12_BLEND srcBlend = D3D12_BLEND_ONE;
+	D3D12_BLEND destBlend = D3D12_BLEND_ZERO;
+	D3D12_BLEND_OP blendOp = D3D12_BLEND_OP_ADD;
+	if (d.contains("blendState"))
+	{
+		if (d["blendState"].contains("src") && d["blendState"]["src"].is_number_integer())
+		{ srcBlend = d["blendState"]["src"].get<D3D12_BLEND>(); }
+		if (d["blendState"].contains("dest") && d["blendState"]["dest"].is_number_integer())
+		{ destBlend = d["blendState"]["dest"].get<D3D12_BLEND>(); }
+		if (d["blendState"].contains("blendOp") && d["blendState"]["blendOp"].is_number_integer())
+		{ blendOp = d["blendState"]["blendOp"].get<D3D12_BLEND_OP>(); }
+	}
+
+	// Pipeline state
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = {};
+	{
+		// Describe the pipeline state
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+		// -- Input assembler related ---
+		psoDesc.InputLayout.NumElements = inputElementCount;
+		psoDesc.InputLayout.pInputElementDescs = inputElements;
+		psoDesc.PrimitiveTopologyType = topology;
+		// Root sig
+		psoDesc.pRootSignature = rootSignature.Get();
+		// -- Shaders (VS/PS) ---
+		psoDesc.VS.pShaderBytecode = vertexShaderByteCode->GetBufferPointer();
+		psoDesc.VS.BytecodeLength = vertexShaderByteCode->GetBufferSize();
+		psoDesc.PS.pShaderBytecode = pixelShaderByteCode->GetBufferPointer();
+		psoDesc.PS.BytecodeLength = pixelShaderByteCode->GetBufferSize();
+		// -- Render targets ---
+		psoDesc.NumRenderTargets = 1;
+		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		psoDesc.SampleDesc.Count = 1;
+		psoDesc.SampleDesc.Quality = 0;
+		// -- States ---
+		psoDesc.RasterizerState.FillMode = fillMode;
+		psoDesc.RasterizerState.CullMode = cullMode;
+		psoDesc.RasterizerState.DepthClipEnable = depthClipEnable;
+		psoDesc.DepthStencilState.DepthEnable = depthEnable;
+		psoDesc.DepthStencilState.DepthFunc = compFunc;
+		psoDesc.DepthStencilState.DepthWriteMask = depthWrite;
+		psoDesc.BlendState.RenderTarget[0].SrcBlend = srcBlend;
+		psoDesc.BlendState.RenderTarget[0].DestBlend = destBlend;
+		psoDesc.BlendState.RenderTarget[0].BlendOp = blendOp;
+		psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		// -- Misc ---
+		psoDesc.SampleMask = 0xffffffff;
+		// Create the pipe state object
+		Graphics::Device->CreateGraphicsPipelineState(&psoDesc,
+			IID_PPV_ARGS(pipelineState.GetAddressOf()));
+	}
+
+	pipelineStates.insert({ filename, pipelineState });
+
+	return pipelineState;
+}
+
 void Assets::LoadUnknownShader(std::wstring path)
 {
 	// Load the file into a blob
 	Microsoft::WRL::ComPtr<ID3DBlob> shaderBlob;
-	if (D3DReadFileToBlob(GetFullPathTo_Wide(path).c_str(), shaderBlob.GetAddressOf()) != S_OK)
+	if (D3DReadFileToBlob(path.c_str(), shaderBlob.GetAddressOf()) != S_OK)
 		return;
 	// Set up shader reflection to get information about
 	// this shader and its variables, buffers, etc.
@@ -303,20 +832,20 @@ void Assets::LoadUnknownShader(std::wstring path)
 	// What kind of shader?
 	switch (D3D12_SHVER_GET_TYPE(shaderDesc.Version))
 	{
-		case D3D12_SHVER_PIXEL_SHADER: LoadPixelShader(path); break; // Load file as Pixel shader
-		case D3D12_SHVER_VERTEX_SHADER: LoadVertexShader(path); break; // Load file as Vertex shader
+	case D3D12_SHVER_PIXEL_SHADER: LoadPixelShader(path); break; // Load file as Pixel shader
+	case D3D12_SHVER_VERTEX_SHADER: LoadVertexShader(path); break; // Load file as Vertex shader
 	}
 }
 Microsoft::WRL::ComPtr<ID3DBlob> Assets::LoadPixelShader(std::wstring path)
 {
 	// Strip out everything before and including the asset root path
-	size_t shaderPathLength = rootAssetPath.size();
-	size_t shaderPathPosition = path.rfind(rootAssetPath);
+	size_t shaderPathLength = rootShaderPath.size();
+	size_t shaderPathPosition = path.rfind(rootShaderPath);
 	std::wstring filename = path.substr(shaderPathPosition + shaderPathLength);
 
 	if (printLoadingProgress)
 	{
-		printf("Loading vertex shader: ");
+		printf("Loading pixel shader: ");
 		wprintf(filename.c_str());
 		printf("\n");
 	}
@@ -335,8 +864,8 @@ Microsoft::WRL::ComPtr<ID3DBlob> Assets::LoadPixelShader(std::wstring path)
 Microsoft::WRL::ComPtr<ID3DBlob> Assets::LoadVertexShader(std::wstring path)
 {
 	// Strip out everything before and including the asset root path
-	size_t shaderPathLength = rootAssetPath.size();
-	size_t shaderPathPosition = path.rfind(rootAssetPath);
+	size_t shaderPathLength = rootShaderPath.size();
+	size_t shaderPathPosition = path.rfind(rootShaderPath);
 	std::wstring filename = path.substr(shaderPathPosition + shaderPathLength);
 
 	if (printLoadingProgress)

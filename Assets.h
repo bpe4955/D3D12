@@ -41,7 +41,8 @@ private:
 public:
 	~Assets();
 	void Initialize(
-		std::wstring rootAssetPath,
+		std::wstring _rootAssetPath,
+		std::wstring _rootShaderPath,
 		Microsoft::WRL::ComPtr<ID3D12Device> _device,
 		bool _printLoadingProgress = false,
 		bool _allowOnDemandLoading = true);
@@ -53,9 +54,10 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetTexture(std::wstring name);
 	//std::shared_ptr<Material> GetMaterial(std::wstring name);
 	//std::shared_ptr<DirectX::SpriteFont> GetSpriteFont(std::wstring name);
-	//Microsoft::WRL::ComPtr<ID3D11SamplerState> GetSampler(std::wstring name);
 	Microsoft::WRL::ComPtr<ID3DBlob> GetPixelShader(std::wstring name);
 	Microsoft::WRL::ComPtr<ID3DBlob> GetVertexShader(std::wstring name);
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSig(std::wstring name);
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPiplineState(std::wstring name);
 	unsigned int GetMeshCount();
 	unsigned int GetTextureCount();
 	//unsigned int GetMaterialCount();
@@ -69,7 +71,8 @@ public:
 	void AddTexture(std::wstring name, D3D12_CPU_DESCRIPTOR_HANDLE texture);
 	//void AddMaterial(std::wstring name, std::shared_ptr<Material> material);
 	//void AddSpriteFont(std::wstring name, std::shared_ptr<DirectX::SpriteFont> font);
-	//void AddSampler(std::wstring name, Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler);
+	void AddRootSig(std::wstring name, Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig);
+	void AddPipelineState(std::wstring name, Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState);
 	void AddPixelShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> ps);
 	void AddVertexShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> vs);
 
@@ -77,6 +80,7 @@ public:
 private:
 	// Variables
 	std::wstring rootAssetPath;
+	std::wstring rootShaderPath;
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
 	bool printLoadingProgress;
 	bool allowOnDemandLoading;
@@ -85,9 +89,13 @@ private:
 	std::unordered_map<std::wstring, D3D12_CPU_DESCRIPTOR_HANDLE> textures;
 	//std::unordered_map<std::wstring, std::shared_ptr<Material>> materials;
 	//std::unordered_map<std::wstring, std::shared_ptr<DirectX::SpriteFont>> spriteFonts;
+	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3D12RootSignature>> rootSigs;
+	bool inputElementsCreated = false;
+	static const unsigned int inputElementCount = 4;
+	D3D12_INPUT_ELEMENT_DESC inputElements[inputElementCount] = {};
+	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3D12PipelineState>> pipelineStates;
 	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3DBlob>> pixelShaders;
 	std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3DBlob>> vertexShaders;
-	//std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<ID3D11SamplerState>> samplers;
 
 	///
 	/// Loading Functions
@@ -97,8 +105,8 @@ private:
 	/*Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>*/ 
 	//void LoadDDSTexture(std::wstring path);
 	//std::shared_ptr<DirectX::SpriteFont> LoadSpriteFont(std::wstring path);
-	/*Microsoft::WRL::ComPtr<ID3D11SamplerState>*/
-	//void LoadSampler(std::wstring path);
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> LoadRootSig(std::wstring path);
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> LoadPipelineState(std::wstring path);
 	//std::shared_ptr<Material> LoadMaterial(std::wstring path);
 	void LoadUnknownShader(std::wstring path);
 	Microsoft::WRL::ComPtr<ID3DBlob> LoadPixelShader(std::wstring path);

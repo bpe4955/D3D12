@@ -26,14 +26,12 @@ using namespace DirectX;
 // --------------------------------------------------------
 void Game::Initialize()
 {
-	Assets::GetInstance().Initialize(L"..\\..\\Assets\\", Graphics::Device, true);
+	LoadAssets();
 	
 	// Helper methods for loading shaders, creating some basic
 	// geometry to draw and some simple camera matrices.
 	// - You'll be expanding and/or replacing these later
-	CreateRootSigAndPipelineState();
 	CreateBasicMaterials();
-	CreateBasicGeometry();
 	CreateBasicEntities();
 	CreateLights();
 
@@ -61,187 +59,15 @@ Game::~Game()
 	delete& Assets::GetInstance();
 }
 
-// --------------------------------------------------------
-// Loads the two basic shaders, then creates the root signature
-// and pipeline state object for our very basic demo.
-// --------------------------------------------------------
-void Game::CreateRootSigAndPipelineState()
+void Game::LoadAssets()
 {
-	// Blobs to hold raw shader byte code used in several steps below
-	Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderByteCode;
-	Microsoft::WRL::ComPtr<ID3DBlob> pixelShaderByteCode;
-	// Load shaders
-	{
-		// Read our compiled vertex shader code into a blob
-		// - Essentially just "open the file and plop its contents here"
-		D3DReadFileToBlob(FixPath(L"VertexShader.cso").c_str(), vertexShaderByteCode.GetAddressOf());
-		D3DReadFileToBlob(FixPath(L"PixelShader.cso").c_str(), pixelShaderByteCode.GetAddressOf());
-	}
-	// Input layout
-	const unsigned int inputElementCount = 4;
-	D3D12_INPUT_ELEMENT_DESC inputElements[inputElementCount] = {}; 
-	{
-		// Create an input layout that describes the vertex format
-		// used by the vertex shader we're using
-		//  - This is used by the pipeline to know how to interpret the raw data
-		//     sitting inside a vertex buffer
-
-		// Set up the first element - a position, which is 3 float values
-		inputElements[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT; // How far into the vertex is this?  Assume it's after the previous element
-		inputElements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// Most formats are described as color channels, really it just means "Three 32-bit floats"
-		inputElements[0].SemanticName = "POSITION";					// This is "POSITION" - needs to match the semantics in our vertex shader input!
-		inputElements[0].SemanticIndex = 0;							// This is the 0th position (there could be more)
-
-		// Set up the second element - a UV, which is 2 more float values
-		inputElements[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
-		inputElements[1].Format = DXGI_FORMAT_R32G32_FLOAT;			// 2x 32-bit floats
-		inputElements[1].SemanticName = "TEXCOORD";					// Match our vertex shader input!
-		inputElements[1].SemanticIndex = 0;							// This is the 0th uv (there could be more)
-
-		// Set up the third element - a normal, which is 3 more float values
-		inputElements[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
-		inputElements[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
-		inputElements[2].SemanticName = "NORMAL";					// Match our vertex shader input!
-		inputElements[2].SemanticIndex = 0;							// This is the 0th normal (there could be more)
-
-		// Set up the fourth element - a tangent, which is 2 more float values
-		inputElements[3].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;	// After the previous element
-		inputElements[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;		// 3x 32-bit floats
-		inputElements[3].SemanticName = "TANGENT";					// Match our vertex shader input!
-		inputElements[3].SemanticIndex = 0;							// This is the 0th tangent (there could be more)
-	}
-
-	// Root Signature
-	{
-		// Describe the range of CBVs needed for the vertex shader
-		D3D12_DESCRIPTOR_RANGE cbvRangeVS = {};
-		cbvRangeVS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-		cbvRangeVS.NumDescriptors = 1;
-		cbvRangeVS.BaseShaderRegister = 0;
-		cbvRangeVS.RegisterSpace = 0;
-		cbvRangeVS.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-		// Describe the range of CBVs needed for the pixel shader
-		D3D12_DESCRIPTOR_RANGE cbvRangePS = {};
-		cbvRangePS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-		cbvRangePS.NumDescriptors = 1;
-		cbvRangePS.BaseShaderRegister = 0;
-		cbvRangePS.RegisterSpace = 0;
-		cbvRangePS.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-		// Create a range of SRV's for textures
-		D3D12_DESCRIPTOR_RANGE srvRange = {};
-		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		srvRange.NumDescriptors = 4; // Set to max number of textures at once (match pixel shader!)
-		srvRange.BaseShaderRegister = 0; // Starts at s0 (match pixel shader!)
-		srvRange.RegisterSpace = 0;
-		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-		// Create the root parameters
-		D3D12_ROOT_PARAMETER rootParams[3] = {};
-		// CBV table param for vertex shader
-		rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[0].DescriptorTable.pDescriptorRanges = &cbvRangeVS;
-		// CBV table param for pixel shader
-		rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[1].DescriptorTable.pDescriptorRanges = &cbvRangePS;
-		// SRV table param
-		rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[2].DescriptorTable.pDescriptorRanges = &srvRange;
-		// Create a single static sampler (available to all pixel shaders at the same slot)
-		D3D12_STATIC_SAMPLER_DESC anisoWrap = {};
-		anisoWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		anisoWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		anisoWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		anisoWrap.Filter = D3D12_FILTER_ANISOTROPIC;
-		anisoWrap.MaxAnisotropy = 16;
-		anisoWrap.MaxLOD = D3D12_FLOAT32_MAX;
-		anisoWrap.ShaderRegister = 0; // register(s0)
-		anisoWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		D3D12_STATIC_SAMPLER_DESC samplers[] = { anisoWrap };
-		// Describe the root signature
-		D3D12_ROOT_SIGNATURE_DESC rootSig = {};
-		rootSig.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-		rootSig.NumParameters = ARRAYSIZE(rootParams);
-		rootSig.pParameters = rootParams;
-		rootSig.NumStaticSamplers = ARRAYSIZE(samplers);
-		rootSig.pStaticSamplers = samplers;
-		// Serialze the root signature
-		ID3DBlob* serializedRootSig = 0;
-		ID3DBlob* errors = 0;
-		D3D12SerializeRootSignature(
-			&rootSig,
-			D3D_ROOT_SIGNATURE_VERSION_1,
-			&serializedRootSig,
-			&errors);
-		// Check for errors during serialization
-		if (errors != 0)
-		{
-			OutputDebugString((wchar_t*)errors->GetBufferPointer());
-		}
-		// Actually create the root sig
-		Graphics::Device->CreateRootSignature(
-			0,
-			serializedRootSig->GetBufferPointer(),
-			serializedRootSig->GetBufferSize(),
-			IID_PPV_ARGS(rootSignature.GetAddressOf()));
-	}
-	// Pipeline state
-	{
-		// Describe the pipeline state
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		// -- Input assembler related ---
-		psoDesc.InputLayout.NumElements = inputElementCount;
-		psoDesc.InputLayout.pInputElementDescs = inputElements;
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		// Root sig
-		psoDesc.pRootSignature = rootSignature.Get();
-		// -- Shaders (VS/PS) ---
-		psoDesc.VS.pShaderBytecode = vertexShaderByteCode->GetBufferPointer();
-		psoDesc.VS.BytecodeLength = vertexShaderByteCode->GetBufferSize();
-		psoDesc.PS.pShaderBytecode = pixelShaderByteCode->GetBufferPointer();
-		psoDesc.PS.BytecodeLength = pixelShaderByteCode->GetBufferSize();
-		// -- Render targets ---
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		psoDesc.SampleDesc.Count = 1;
-		psoDesc.SampleDesc.Quality = 0;
-		// -- States ---
-		psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-		psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-		psoDesc.RasterizerState.DepthClipEnable = true;
-		psoDesc.DepthStencilState.DepthEnable = true;
-		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-		psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-		psoDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
-		psoDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
-		psoDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-		psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-		// -- Misc ---
-		psoDesc.SampleMask = 0xffffffff;
-		// Create the pipe state object
-		Graphics::Device->CreateGraphicsPipelineState(&psoDesc,
-			IID_PPV_ARGS(pipelineState.GetAddressOf()));
-	}
+	// Initialize the asset manager and set it up to load assets on demand
+	// Note: You could call LoadAllAssets() to load literally everything
+	//       found in the asstes folder, but "load on demand" is more efficient
+	Assets::GetInstance().Initialize(L"../../Assets/", L"./",
+		Graphics::Device, true);
 }
 
-// --------------------------------------------------------
-// Creates the geometry we're going to draw
-// --------------------------------------------------------
-void Game::CreateBasicGeometry()
-{
-	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/sphere.obj").c_str()));
-	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cube.obj").c_str()));
-	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/helix.obj").c_str()));
-	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/cylinder.obj").c_str()));
-	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Basic Meshes/torus.obj").c_str()));
-	//meshes.push_back(std::make_shared<Mesh>(FixPath(L"../../Assets/Models/Pikachu(Gigantamax).fbx").c_str()));
-	
-}
 
 void Game::CreateBasicMaterials()
 {
@@ -279,6 +105,7 @@ void Game::CreateBasicMaterials()
 	// Create materials
 	// Note: Samplers are handled by a single static sampler in the
 	// root signature for this demo, rather than per-material
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = assets.GetPiplineState(L"PipelineStates/BasicCullNone");
 	std::shared_ptr<Material> cobbleMat = std::make_shared<Material>(pipelineState, XMFLOAT3(1, 1, 1));
 	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_albedo"), 0);
 	cobbleMat->AddTexture(assets.GetTexture(L"Textures/PBR/cobblestone_normals"), 1);
@@ -472,9 +299,9 @@ void Game::Draw(float deltaTime, float totalTime)
 	// Rendering here!
 	{
 		// Set overall pipeline state
-		Graphics::commandList->SetPipelineState(pipelineState.Get());
+		Graphics::commandList->SetPipelineState(Assets::GetInstance().GetPiplineState(L"PipelineStates/BasicCullNone").Get());
 		// Root sig (must happen before root descriptor table)
-		Graphics::commandList->SetGraphicsRootSignature(rootSignature.Get());
+		Graphics::commandList->SetGraphicsRootSignature(Assets::GetInstance().GetRootSig(L"RootSigs/BasicRootSig").Get());
 		// Set up other commands for rendering
 		Graphics::commandList->OMSetRenderTargets(1, &Graphics::rtvHandles[Graphics::currentSwapBuffer], true, &Graphics::dsvHandle);
 		Graphics::commandList->RSSetViewports(1, &Graphics::viewport);

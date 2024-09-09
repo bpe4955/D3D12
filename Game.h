@@ -27,24 +27,20 @@ private:
 
 	// Initialization helper methods - feel free to customize, combine, remove, etc.
 	//void LoadShaders();
-	void CreateBasicGeometry();
+	void LoadAssets();
 	void CreateBasicMaterials();
 	void CreateBasicEntities();
 	void CreateLights();
-	void CreateRootSigAndPipelineState();
 
 	// Note the usage of ComPtr below
 	//  - This is a smart pointer for objects that abide by the
 	//     Component Object Model, which DirectX objects do
 	//  - More info here: https://github.com/Microsoft/DirectXTK/wiki/ComPtr
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
 
 	// Ideally later move this into a Scene object
 	std::vector<std::shared_ptr<Camera>> cameras;
 	unsigned int currentCameraIndex;
 
-	//std::vector<std::shared_ptr<Mesh>> meshes;
 	std::vector<std::shared_ptr<Material>> materials;
 	std::vector<std::shared_ptr<Entity>> entities;
 	std::vector<Light> lights;

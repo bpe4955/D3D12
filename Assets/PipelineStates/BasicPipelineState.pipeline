@@ -1,0 +1,57 @@
+{
+    "shaders" :
+    {
+        "pixel" : "PixelShader",
+        "vertex" : "VertexShader"
+    },
+    "rootSig" : "RootSigs/BasicRootSig",
+    "topology" : "TRIANGLE",
+    "rasterizer" : 
+    {
+        "fill" : "SOLID",
+        "cull" : "BACK",
+        "depthClip": "TRUE"
+    },
+    "depthStencil" : 
+    {
+        "depthEnable" : "TRUE",
+        "comparison" : "LESS",
+        "write" : "ALL"
+    },
+    "blendState" : 
+    {
+        "D3D12_BLEND" :
+        {
+            "1" :   "D3D12_BLEND_ZERO",
+            "2" :   "D3D12_BLEND_ONE",
+            "3" :   "D3D12_BLEND_SRC_COLOR",
+            "4" :   "D3D12_BLEND_INV_SRC_COLOR",
+            "5" :   "D3D12_BLEND_SRC_ALPHA",
+            "6" :   "D3D12_BLEND_INV_SRC_ALPHA ",
+            "7" :   "D3D12_BLEND_DEST_ALPHA ",
+            "8" :   "D3D12_BLEND_INV_DEST_ALPHA ",
+            "9" :   "D3D12_BLEND_DEST_COLOR ",
+            "10":   "D3D12_BLEND_INV_DEST_COLOR ",
+            "11":   "D3D12_BLEND_SRC_ALPHA_SAT ",
+            "14":  "D3D12_BLEND_BLEND_FACTOR ",
+            "15":   "D3D12_BLEND_INV_BLEND_FACTOR ",
+            "16":   "D3D12_BLEND_SRC1_COLOR ",
+            "17":   "D3D12_BLEND_INV_SRC1_COLOR  ",
+            "18":   "D3D12_BLEND_SRC1_ALPHA  ",
+            "19":   "D3D12_BLEND_INV_SRC1_ALPHA  ",
+            "20":   "D3D12_BLEND_ALPHA_FACTOR  ",
+            "21":   "D3D12_BLEND_INV_ALPHA_FACTOR  "
+        },
+        "src" : 2,
+        "dest" : 1,
+        "D3D12_BLEND_OP" :
+        {
+            "1" :   "D3D12_BLEND_OP_ADD ",
+            "2" :   "D3D12_BLEND_OP_SUBTRACT ",
+            "3" :   "D3D12_BLEND_OP_REV_SUBTRACT ",
+            "4" :   "D3D12_BLEND_OP_MIN ",
+            "5" :   "D3D12_BLEND_OP_MAX "
+        },
+        "blendOp" : 1
+    }
+}

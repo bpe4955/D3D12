@@ -1,0 +1,22 @@
+{
+    "numTextures": 4,
+    "baseShaderRegister": 0,
+    "sampler": 
+    {
+        "ADDRESS_MODE" : 
+        {
+            "1" : "WRAP",
+            "2" : "MIRROR",
+            "3" : "CLAMP",
+            "4" : "BORDER",
+            "5" : "MIRROR_ONCE"
+        },
+        "u": 1,
+        "v": 1,
+        "w": 1,
+        "filter": "ANISOTROPIC",
+        "maxAnisotropy": 16,
+        "borderColor": "TRANSPARENT_BLACK",
+        "comparison": "NEVER"
+    }
+}

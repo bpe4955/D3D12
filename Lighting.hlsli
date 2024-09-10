@@ -59,7 +59,7 @@ static const float QUARTER_PI = PI / 4.0f;
 float3 NormalMapping(float2 uv, float3 normal, float3 tangent)
 {
 	// Grab the normal from the map
-    float3 normalFromMap = NormalMap.Sample(Sampler, uv).xyz;
+    float3 normalFromMap = normalize(NormalMap.Sample(Sampler, uv).rgb * 2 - 1);
 
 	// Gather the required vectors for converting the normal
     float3 N = normal;

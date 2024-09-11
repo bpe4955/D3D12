@@ -1,6 +1,7 @@
 #include "D3D12Helper.h"
 #include "WICTextureLoader.h"
 #include "ResourceUploadBatch.h"
+#include <DDSTextureLoader.h>
 using namespace DirectX;
 
 
@@ -75,6 +76,7 @@ void D3D12Helper::WaitForGPU()
 		waitFence->SetEventOnCompletion(waitFenceCounter, waitFenceEvent);
 		WaitForSingleObject(waitFenceEvent, INFINITE);
 	}
+	ResetFrameSyncCounters();
 }
 
 void D3D12Helper::ResetFrameSyncCounters()
@@ -154,6 +156,64 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3D12Helper::LoadTexture(const wchar_t* file, bool g
 	// Note: Using a null description results in the "default" SRV (same format, all mips, all array slices, etc.)
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descHeap->GetCPUDescriptorHandleForHeapStart();
 	device->CreateShaderResourceView(texture.Get(), 0, cpuHandle);
+
+	// Return the CPU descriptor handle, which can be used to
+	// copy the descriptor to a shader-visible heap later
+	return cpuHandle;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12Helper::LoadTextureDDS(const wchar_t* file, bool generateMips, bool isCubeMap)
+{
+	// Helper function from DXTK for uploading a resource
+	// (like a texture) to the appropriate GPU memory
+	ResourceUploadBatch upload(device.Get());
+	upload.Begin();
+
+	// Attempt to create the texture
+	Microsoft::WRL::ComPtr<ID3D12Resource> texture;
+	CreateDDSTextureFromFile(device.Get(), upload, file, texture.GetAddressOf(), generateMips, 0Ui64, 0,
+		&isCubeMap);
+
+	// Perform the upload and wait for it to finish before returning the texture
+	auto finish = upload.End(commandQueue.Get());
+	finish.wait();
+
+	// Now that we have the texture, add to our list and make a CPU-side descriptor heap
+	// just for this texture's SRV.  Note that it would probably be better to put all 
+	// texture SRVs into the same descriptor heap, but we don't know how many we'll need
+	// until they're all loaded and this is a quick and dirty implementation!
+	textures.push_back(texture);
+
+	// Create the CPU-SIDE descriptor heap for our descriptor
+	D3D12_DESCRIPTOR_HEAP_DESC dhDesc = {};
+	dhDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE; // Non-shader visible for CPU-side-only descriptor heap!
+	dhDesc.NodeMask = 0;
+	dhDesc.NumDescriptors = 1;
+	dhDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descHeap;
+	device->CreateDescriptorHeap(&dhDesc, IID_PPV_ARGS(descHeap.GetAddressOf()));
+	cpuSideTextureDescriptorHeaps.push_back(descHeap);
+
+	// Create the SRV on this descriptor heap
+	// Create a Shader Resource View Description
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = texture.Get()->GetDesc().Format; // Same format as texture
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE; // Treat this as a cube!
+	//srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.TextureCube.MostDetailedMip = 0; // Index of the first mip we want to see
+	srvDesc.TextureCube.MipLevels = 1; // Only need access to 1 mip
+	srvDesc.TextureCube.ResourceMinLODClamp = 0; // Minimum mipmap level that can be accessed (0 means all)
+	srvDesc.Texture2DArray.MostDetailedMip = 0;
+	srvDesc.Texture2DArray.MipLevels = 1;
+	srvDesc.Texture2DArray.FirstArraySlice = 0;
+	srvDesc.Texture2DArray.ArraySize = 6;
+	srvDesc.Texture2DArray.PlaneSlice = 0;
+
+	// Note: Using a null description results in the "default" SRV (same format, all mips, all array slices, etc.)
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descHeap->GetCPUDescriptorHandleForHeapStart();
+	device->CreateShaderResourceView(texture.Get(), isCubeMap ? &srvDesc : 0, cpuHandle);
 
 	// Return the CPU descriptor handle, which can be used to
 	// copy the descriptor to a shader-visible heap later

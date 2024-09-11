@@ -7,6 +7,7 @@
 
 #include "Camera.h"
 #include "Entity.h"
+#include "Sky.h"
 
 class Game
 {
@@ -44,5 +45,6 @@ private:
 	std::vector<std::shared_ptr<Material>> materials;
 	std::vector<std::shared_ptr<Entity>> entities;
 	std::vector<Light> lights;
+	std::unique_ptr<Sky> skyBox;
 };
 

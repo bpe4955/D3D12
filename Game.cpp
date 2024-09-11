@@ -104,6 +104,8 @@ void Game::CreateBasicEntities()
 		materials[0]));
 	entities.back()->GetTransform()->SetScale(0.5f);
 	entities.back()->GetTransform()->SetParent(entities[0]->GetTransform().get(), true);
+
+	skyBox = std::make_unique<Sky>(Sky(L"Textures/Skies/Planet"));
 }
 
 void Game::CreateLights()
@@ -282,6 +284,7 @@ void Game::Draw(float deltaTime, float totalTime)
 			Graphics::commandList->SetPipelineState(mat->GetPipelineState().Get());// Set the SRV descriptor handle for this material's textures
 			{
 				PixelShaderData psData = {};
+				psData.colorTint = mat->GetColorTint();
 				psData.uvScale = mat->GetUVScale();
 				psData.uvOffset = mat->GetUVOffset();
 				psData.cameraPosition = cameras[currentCameraIndex]->GetTransform()->GetPosition();
@@ -315,6 +318,56 @@ void Game::Draw(float deltaTime, float totalTime)
 			Graphics::commandList->DrawIndexedInstanced(entityPtr->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
 		}
 
+		//// Render the Sky
+		{
+			// Set overall pipeline state
+			Graphics::commandList->SetPipelineState(Assets::GetInstance().GetPiplineState(L"PipelineStates/Sky").Get());
+			// Root sig (must happen before root descriptor table)
+			Graphics::commandList->SetGraphicsRootSignature(Assets::GetInstance().GetRootSig(L"RootSigs/Sky").Get());
+			// Vertex Data
+			{
+				// Fill out a SkyVSData struct with the camera’s matrices.
+				SkyVSData data = {};
+				data.view = cameras[currentCameraIndex]->GetView();
+				data.proj = cameras[currentCameraIndex]->GetProjection();
+				// Use FillNextConstantBufferAndGetGPUDescriptorHandle() 
+				// to copy the above struct to the GPU and get back the corresponding handle to the constant buffer view.
+				D3D12_GPU_DESCRIPTOR_HANDLE handle =
+					d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&data), sizeof(SkyVSData));
+				// Use commandList->SetGraphicsRootDescriptorTable(0, handle) to set the handle from the previous line.
+				Graphics::commandList->SetGraphicsRootDescriptorTable(0, handle);
+			}
+		
+			// Pixel Shader
+			{
+				SkyPSData psData = {};
+				psData.colorTint = skyBox->GetColorTint();
+		
+				// Send this to a chunk of the constant buffer heap
+				// and grab the GPU handle for it so we can set it for this draw
+				D3D12_GPU_DESCRIPTOR_HANDLE cbHandlePS = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
+					(void*)(&psData), sizeof(SkyPSData));
+		
+				// Set this constant buffer handle
+				// Note: This assumes that descriptor table 1 is the
+				//       place to put this particular descriptor.  This
+				//       is based on how we set up our root signature.
+				Graphics::commandList->SetGraphicsRootDescriptorTable(1, cbHandlePS);
+			}
+			// Set the SRV descriptor handle for this sky's textures
+			// Note: This assumes that descriptor table 2 is for textures (as per our root sig)
+			Graphics::commandList->SetGraphicsRootDescriptorTable(2, skyBox->GetTextureGPUHandle());
+		
+			// Grab the vertex buffer view and index buffer view from this entity’s mesh
+			D3D12_INDEX_BUFFER_VIEW indexBuffView = skyBox->GetMesh()->GetIndexBufferView();
+			D3D12_VERTEX_BUFFER_VIEW vertexBuffView = skyBox->GetMesh()->GetVertexBufferView();
+			// Set them using IASetVertexBuffers() and IASetIndexBuffer()
+			Graphics::commandList->IASetIndexBuffer(&indexBuffView);
+			Graphics::commandList->IASetVertexBuffers(0, 1, &vertexBuffView);
+		
+			// Call DrawIndexedInstanced() using the index count of this entity’s mesh
+			Graphics::commandList->DrawIndexedInstanced(skyBox->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
+		}
 	}
 
 	// Present

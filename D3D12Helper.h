@@ -52,6 +52,7 @@ public:
 	unsigned int SyncSwapChain(unsigned int currentSwapBufferIndex);
 	// Texture Loading
 	D3D12_CPU_DESCRIPTOR_HANDLE LoadTexture(const wchar_t* file, bool generateMips = true);
+	D3D12_CPU_DESCRIPTOR_HANDLE LoadTextureDDS(const wchar_t* file, bool generateMips = true, bool isCubeMap = false);
 	D3D12_GPU_DESCRIPTOR_HANDLE CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(
 		D3D12_CPU_DESCRIPTOR_HANDLE firstDescriptorToCopy,
 		unsigned int numDescriptorsToCopy);

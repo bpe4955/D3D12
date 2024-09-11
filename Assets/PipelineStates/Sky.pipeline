@@ -1,0 +1,20 @@
+{
+    "shaders" :
+    {
+        "pixel" : "SkyPS",
+        "vertex" : "SkyVS"
+    },
+    "rootSig" : "RootSigs/Sky",
+    "topology" : "TRIANGLE",
+    "rasterizer" : 
+    {
+        "fill" : "SOLID",
+        "cull" : "FRONT",
+        "depthClip": "TRUE"
+    },
+    "depthStencil" : 
+    {
+        "depthEnable" : "TRUE",
+        "comparison" : "LESSEQUAL"
+    }
+}

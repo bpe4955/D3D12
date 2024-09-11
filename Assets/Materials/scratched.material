@@ -1,6 +1,6 @@
 {
     "pipeline" : "PipelineStates/BasicCullNone",
-    "tint": [1.0, 1.0, 1.0],
+    "tint": [1.0, 1.0, 1.0, 1.0],
     "uvScale": [1.0, 1.0],
     "uvOffset": [0.0, 0.0],
     "samplers": [{

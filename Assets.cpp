@@ -160,7 +160,7 @@ std::shared_ptr<Mesh> Assets::GetMesh(std::wstring name)
 	// Unsuccessful
 	return 0;
 }
-D3D12_CPU_DESCRIPTOR_HANDLE Assets::GetTexture(std::wstring name)
+D3D12_CPU_DESCRIPTOR_HANDLE Assets::GetTexture(std::wstring name, bool generateMips, bool isCubeMap)
 {
 	// Search and return texture if found
 	auto it = textures.find(name);
@@ -179,13 +179,19 @@ D3D12_CPU_DESCRIPTOR_HANDLE Assets::GetTexture(std::wstring name)
 		if (std::filesystem::exists(filePathPNG)) { return LoadTexture(filePathPNG); }
 
 		// Is it a DDS?
-		//std::wstring filePathDDS = FixPath(rootAssetPath + name + L".dds");
-		//if (std::filesystem::exists(filePathDDS)) { return LoadDDSTexture(filePathDDS); }
+		std::wstring filePathDDS = FixPath(rootAssetPath + name + L".dds");
+		if (std::filesystem::exists(filePathDDS)) { return LoadDDSTexture(filePathDDS, generateMips, isCubeMap); }
 	}
 
 	// Unsuccessful
 	return {};
 }
+/// <summary>
+/// 
+/// </summary>
+/// <param name="path">File path to texture folder 
+/// Ex: L"Textures/Skies/Planet/"</param>
+/// <returns></returns>
 Microsoft::WRL::ComPtr<ID3DBlob> Assets::GetPixelShader(std::wstring name)
 {
 	// Search and return shader if found
@@ -376,10 +382,236 @@ D3D12_CPU_DESCRIPTOR_HANDLE Assets::LoadTexture(std::wstring path)
 	return srv;
 }
 
-//void Assets::LoadDDSTexture(std::wstring path)
-//{
-//}
-//
+D3D12_CPU_DESCRIPTOR_HANDLE Assets::LoadDDSTexture(std::wstring path, bool generateMips, bool isCubeMap)
+{
+	// Strip out everything before and including the asset root path
+	size_t assetPathLength = rootAssetPath.size();
+	size_t assetPathPosition = path.rfind(rootAssetPath);
+	std::wstring filename = path.substr(assetPathPosition + assetPathLength);
+
+	if (printLoadingProgress)
+	{
+		printf("Loading texture: ");
+		wprintf(filename.c_str());
+		printf("\n");
+	}
+
+	// Load the texture
+	D3D12_CPU_DESCRIPTOR_HANDLE srv =
+		D3D12Helper::GetInstance().LoadTextureDDS(path.c_str(), generateMips, isCubeMap);
+
+	// Remove the file extension the end of the filename before using as a key
+	filename = RemoveFileExtension(filename);
+
+	// Add to the dictionary
+	textures.insert({ filename, srv });
+	return srv;
+}
+
+/// <summary>
+/// Create a tex cube from textures in a given folder.
+/// https://alextardif.com/D3D11To12P3.html
+/// </summary>
+/// <param name="path">The folder that all the textures are stored in. 
+/// Assumes they are named "back", "down", etc. and are pngs.</param>
+/// <returns>GPU descriptor handle of the created Texture Cube</returns>
+/*
+D3D12_GPU_DESCRIPTOR_HANDLE Assets::LoadTexCubeDEPRECATED(std::wstring path)
+{
+	D3D12Helper::GetInstance().WaitForGPU();
+
+	// Strip out everything before and including the asset root path
+	size_t assetPathLength = rootAssetPath.size();
+	size_t assetPathPosition = path.rfind(rootAssetPath);
+	std::wstring filename = path.substr(assetPathPosition + assetPathLength);
+
+	if (printLoadingProgress)
+	{
+		printf("Loading texture cube: ");
+		wprintf(filename.c_str());
+		printf("\n");
+	}
+
+	// Load the 6 textures into an array.
+	// - We need references to the TEXTURES, not SHADER RESOURCE VIEWS!
+	// - Explicitly NOT generating mipmaps, as we don't need them for the sky!
+	// - Order matters here! +X, -X, +Y, -Y, +Z, -Z
+	DirectX::ResourceUploadBatch upload(Graphics::Device.Get());
+	upload.Begin();
+	Microsoft::WRL::ComPtr<ID3D12Resource> subTextures[6] = {};
+	DirectX::CreateWICTextureFromFile(Graphics::Device.Get(), upload, (path + L"right.png").c_str(), subTextures[0].GetAddressOf());
+	DirectX::CreateWICTextureFromFile(Graphics::Device.Get(), upload, (path + L"left.png").c_str(), subTextures[1].GetAddressOf());
+	DirectX::CreateWICTextureFromFile(Graphics::Device.Get(), upload, (path + L"up.png").c_str(), subTextures[2].GetAddressOf());
+	DirectX::CreateWICTextureFromFile(Graphics::Device.Get(), upload, (path + L"down.png").c_str(), subTextures[3].GetAddressOf());
+	DirectX::CreateWICTextureFromFile(Graphics::Device.Get(), upload, (path + L"front.png").c_str(), subTextures[4].GetAddressOf());
+	DirectX::CreateWICTextureFromFile(Graphics::Device.Get(), upload, (path + L"back.png").c_str(), subTextures[5].GetAddressOf());
+	// Perform the upload and wait for it to finish before returning the texture
+	auto finish = upload.End(Graphics::commandQueue.Get());
+	finish.wait();
+
+	// We'll assume all of the textures are the same color format and resolution,
+	// so get the description of the first texture
+	D3D12_RESOURCE_DESC faceDesc = subTextures[0]->GetDesc();
+
+	// Describes the final heap (assuming it's the same as other textures)
+	D3D12_HEAP_PROPERTIES props = {};
+	subTextures[0].Get()->GetHeapProperties(&props, 0);
+	// Describe the resource for the cube map, which is simply a "texture 2d array"
+	D3D12_RESOURCE_DESC cubeDesc = {};
+	cubeDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	cubeDesc.Alignment = 0;
+	cubeDesc.Width = faceDesc.Width; // Match the size
+	cubeDesc.Height = faceDesc.Height; // Match the size
+	cubeDesc.DepthOrArraySize = 6; // Cube map!
+	cubeDesc.MipLevels = 1; // Only need 1
+	cubeDesc.Format = faceDesc.Format; // Match the loaded texture's color format
+	cubeDesc.SampleDesc.Count = 1;
+	cubeDesc.SampleDesc.Quality = 0;
+
+	// Create the final texture resource to hold the cube map
+	Microsoft::WRL::ComPtr<ID3D12Resource> cubeMapTexture;
+
+	// Now create an intermediate upload heap for copying initial data
+	D3D12_HEAP_PROPERTIES heapProps = {};
+	subTextures[0].Get()->GetHeapProperties(&heapProps, 0);
+	D3D12_HEAP_PROPERTIES defaultProperties;
+	defaultProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+	defaultProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	defaultProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	defaultProperties.CreationNodeMask = 0;
+	defaultProperties.VisibleNodeMask = 0;
+
+	Graphics::Device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &cubeDesc,
+		D3D12_RESOURCE_STATE_COPY_DEST, NULL, IID_PPV_ARGS(cubeMapTexture.GetAddressOf()));
+
+	// Creates a temporary command allocator and list so we don't
+	// screw up any other ongoing work (since resetting a command allocator
+	// cannot happen while its list is being executed).  These ComPtrs will
+	// be cleaned up automatically when they go out of scope.
+	// Note: This certainly isn't efficient, but hopefully this only
+	//       happens during start-up.  Otherwise, refactor this to use
+	//       the existing list and allocator(s).
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> localAllocator;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> localList;
+
+	Graphics::Device->CreateCommandAllocator(
+		D3D12_COMMAND_LIST_TYPE_DIRECT,
+		IID_PPV_ARGS(localAllocator.GetAddressOf()));
+
+	Graphics::Device->CreateCommandList(
+		0,
+		D3D12_COMMAND_LIST_TYPE_DIRECT,
+		localAllocator.Get(),
+		0,
+		IID_PPV_ARGS(localList.GetAddressOf()));
+
+	// Get textures ready to copy
+	for (int i = 0; i < 6; i++)
+	{
+		// Transition the buffer to generic read for the rest of the app lifetime (presumable)
+		D3D12_RESOURCE_BARRIER rb = {};
+		rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		rb.Transition.pResource = subTextures[i].Get();
+		rb.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		rb.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+		rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		localList->ResourceBarrier(1, &rb);
+	}
+
+	// Copy data
+	for (UINT subResourceIndex = 0; subResourceIndex < 6; subResourceIndex++)
+	{
+		D3D12_TEXTURE_COPY_LOCATION destination = {};
+		destination.pResource = cubeMapTexture.Get();
+		destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		destination.SubresourceIndex = subResourceIndex;
+
+		D3D12_TEXTURE_COPY_LOCATION source = {};
+		source.pResource = subTextures[subResourceIndex].Get();
+		source.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		source.SubresourceIndex = 0;
+
+		localList->CopyTextureRegion(&destination, 0, 0, 0, &source, NULL);
+	}
+
+	// Transition the texture to shader resource for the rest of the app lifetime (presumable)
+	D3D12_RESOURCE_BARRIER rb = {};
+	rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	rb.Transition.pResource = cubeMapTexture.Get();
+	rb.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	rb.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	localList->ResourceBarrier(1, &rb);
+
+	// Do the same for all the textures
+	for (int i = 0; i < 6; i++)
+	{
+		// Transition the buffer to generic read for the rest of the app lifetime (presumable)
+		D3D12_RESOURCE_BARRIER rb = {};
+		rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		rb.Transition.pResource = subTextures[i].Get();
+		rb.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+		rb.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		localList->ResourceBarrier(1, &rb);
+	}
+
+	// Execute the command list and return the finished buffer
+	// Execute the local command list and wait for it to complete
+	// before returning the final buffer
+	localList->Close();
+	ID3D12CommandList* list[] = { localList.Get() };
+	Graphics::commandQueue->ExecuteCommandLists(1, list);
+	D3D12Helper::GetInstance().WaitForGPU();
+	
+	// Store textures so they don't fall out of scope
+	for (int i = 0; i < 6; i++)
+	{
+		//storedTextures.push_back(subTextures[i]);
+	}
+
+	// Create a Shader Resource View Description
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = cubeDesc.Format; // Same format as texture
+	//srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE; // Treat this as a cube!
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.TextureCube.MostDetailedMip = 0; // Index of the first mip we want to see
+	srvDesc.TextureCube.MipLevels = 1; // Only need access to 1 mip
+	srvDesc.TextureCube.ResourceMinLODClamp = 0; // Minimum mipmap level that can be accessed (0 means all)
+	srvDesc.Texture2DArray.MostDetailedMip = 0;
+	srvDesc.Texture2DArray.MipLevels = 1;
+	srvDesc.Texture2DArray.FirstArraySlice = 0;
+	srvDesc.Texture2DArray.ArraySize = 6;
+	srvDesc.Texture2DArray.PlaneSlice = 0;
+
+	
+	// Create the CPU-SIDE descriptor heap for our descriptor
+	D3D12_DESCRIPTOR_HEAP_DESC dhDesc = {};
+	dhDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE; // Non-shader visible for CPU-side-only descriptor heap!
+	dhDesc.NodeMask = 0;
+	dhDesc.NumDescriptors = 1;
+	dhDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descHeap;
+	device->CreateDescriptorHeap(&dhDesc, IID_PPV_ARGS(descHeap.GetAddressOf()));
+	//cpuSideTextureDescriptorHeaps.push_back(descHeap);
+
+	// Create the SRV on this descriptor heap
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descHeap->GetCPUDescriptorHandleForHeapStart();
+	Graphics::Device->CreateShaderResourceView(cubeMapTexture.Get(), &srvDesc, cpuHandle);
+
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = D3D12Helper::GetInstance().CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(cpuHandle, 1);
+	// Return the CPU descriptor handle, which can be used to
+	// copy the descriptor to a shader-visible heap later
+	//texCubes.insert({ filename, gpuHandle });
+	return gpuHandle;
+}
+*/
+
 //std::shared_ptr<DirectX::SpriteFont> Assets::LoadSpriteFont(std::wstring path)
 //{
 //	return std::shared_ptr<DirectX::SpriteFont>();
@@ -949,12 +1181,13 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 	std::shared_ptr<Material> mat = std::make_shared<Material>(pipelineState);
 
 	// Check for 3-component tint
-	if (d.contains("tint") && d["tint"].size() == 3)
+	if (d.contains("tint") && d["tint"].size() == 4)
 	{
-		DirectX::XMFLOAT3 tint(0, 0, 0);
+		DirectX::XMFLOAT4 tint(1, 1, 1, 1);
 		tint.x = d["tint"][0].get<float>();
 		tint.y = d["tint"][1].get<float>();
 		tint.z = d["tint"][2].get<float>();
+		tint.w = d["tint"][3].get<float>();
 		mat->SetColorTint(tint);
 	}
 

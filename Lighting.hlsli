@@ -27,6 +27,7 @@ struct Light
 
 cbuffer ExternalData : register(b0)
 {
+    float4 colorTint;
     float2 uvScale;
     float2 uvOffset;
     float3 cameraPosition;
@@ -308,7 +309,7 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
     //    float3 h = normalize(viewVector + normalize(-light.Direction));
     //    finalColor = lerp(totalLight, reflectionColor, F_Schlick(viewVector, viewVector, F0_NON_METAL));
     //}
-    return float4(finalColor, 1.0f);
+    return float4(finalColor * colorTint.rgb, 1.0f);
 }
 
 #endif

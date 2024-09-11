@@ -7,20 +7,20 @@ class Material
 public:
 	Material(
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState,
-		DirectX::XMFLOAT3 _colorTint = DirectX::XMFLOAT3(1, 1, 1),
+		DirectX::XMFLOAT4 _colorTint = DirectX::XMFLOAT4(1, 1, 1, 1),
 		DirectX::XMFLOAT2 _uvOffset = DirectX::XMFLOAT2(0, 0),
 		DirectX::XMFLOAT2 _uvScale = DirectX::XMFLOAT2(1, 1));
 
 	// Getters
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState();
-	DirectX::XMFLOAT3 GetColorTint();
+	DirectX::XMFLOAT4 GetColorTint();
 	DirectX::XMFLOAT2 GetUVOffset();
 	DirectX::XMFLOAT2 GetUVScale();
 	D3D12_GPU_DESCRIPTOR_HANDLE GetFinalGPUHandleForTextures();
 
 	// Setters
 	void SetPipelineState(Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState);
-	void SetColorTint(DirectX::XMFLOAT3 _colorTint);
+	void SetColorTint(DirectX::XMFLOAT4 _colorTint);
 	void SetUVOffset(DirectX::XMFLOAT2 _uvOffset);
 	void AddUVOffset(DirectX::XMFLOAT2 _uvOffset);
 	void SetUVScale(DirectX::XMFLOAT2  _uvScale);
@@ -40,7 +40,7 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE finalGPUHandleForSRVs;
 
 	// Material Properties
-	DirectX::XMFLOAT3 colorTint;
+	DirectX::XMFLOAT4 colorTint;
 	DirectX::XMFLOAT2 uvOffset;
 	DirectX::XMFLOAT2 uvScale;
 };

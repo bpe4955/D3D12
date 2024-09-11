@@ -52,7 +52,7 @@ public:
 
 	// Getters
 	std::shared_ptr<Mesh> GetMesh(std::wstring name);
-	D3D12_CPU_DESCRIPTOR_HANDLE GetTexture(std::wstring name);
+	D3D12_CPU_DESCRIPTOR_HANDLE GetTexture(std::wstring name, bool generateMips = true, bool isCubeMap = false);
 	//std::shared_ptr<DirectX::SpriteFont> GetSpriteFont(std::wstring name);
 	Microsoft::WRL::ComPtr<ID3DBlob> GetPixelShader(std::wstring name);
 	Microsoft::WRL::ComPtr<ID3DBlob> GetVertexShader(std::wstring name);
@@ -105,8 +105,9 @@ private:
 	/// 
 	std::shared_ptr<Mesh> LoadMesh(std::wstring path);
 	D3D12_CPU_DESCRIPTOR_HANDLE LoadTexture(std::wstring path);
+	D3D12_CPU_DESCRIPTOR_HANDLE LoadDDSTexture(std::wstring path, bool generateMips = true, bool isCubeMap = false);
+	//D3D12_GPU_DESCRIPTOR_HANDLE LoadTexCubeDEPRECATED(std::wstring path);
 	/*Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>*/ 
-	//void LoadDDSTexture(std::wstring path);
 	//std::shared_ptr<DirectX::SpriteFont> LoadSpriteFont(std::wstring path);
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> LoadRootSig(std::wstring path);
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> LoadPipelineState(std::wstring path);

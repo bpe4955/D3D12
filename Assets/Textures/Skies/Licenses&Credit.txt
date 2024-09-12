@@ -1,0 +1,40 @@
+======================================
+== Clouds Pink/Blue == Cold Sunset == Planet ==
+======================================
+
+What
+======
+This is a small sample edition of the full version of Allsky.
+It contains a set of 10 skyboxes for use in your environments.
+I hope you find them useful!
+
+You can Buy the full version of AllSky here : 
+
+https://assetstore.unity.com/packages/2d/textures-materials/sky/allsky-200-sky-skybox-set-10109
+
+Author
+======
+This asset pack is by Richard Whitelock.
+	A game developer, digital artist & photographer.
+	15+ years in the games industry working in a variety of senior art roles on 20+ titles. 
+	Particularly experienced in environment art, lighting & special FX.
+	Currently working on various indie game & personal projects. 
+
+	http://www.richardwhitelock.com
+
+
+
+
+==========================
+===== Stairs == Yokohama =====
+==========================
+
+Author
+======
+This is the work of Emil Persson, aka Humus.
+http://www.humus.name
+
+License
+=======
+This work is licensed under a Creative Commons Attribution 3.0 Unported License.
+http://creativecommons.org/licenses/by/3.0/

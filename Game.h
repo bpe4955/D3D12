@@ -45,6 +45,9 @@ private:
 	std::vector<std::shared_ptr<Material>> materials;
 	std::vector<std::shared_ptr<Entity>> entities;
 	std::vector<Light> lights;
-	std::unique_ptr<Sky> skyBox;
+	std::shared_ptr<Sky> skyBox;
+
+	// Helper Functions
+	DirectX::XMFLOAT3 MouseDirection();
 };
 

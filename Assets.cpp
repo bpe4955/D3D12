@@ -58,6 +58,7 @@ void Assets::LoadAllAssets()
 	// These files need to be loaded after all basic assets
 	std::vector<std::wstring> pipelinePaths;
 	std::vector<std::wstring> materialPaths;
+	std::vector<std::wstring> skyPaths;
 
 	// Recursively go through all directories starting at the root
 	for (auto& item : std::filesystem::recursive_directory_iterator(FixPath(rootAssetPath)))
@@ -72,15 +73,11 @@ void Assets::LoadAllAssets()
 
 			// Determine the file type
 			if (EndsWith(itemPath, L".obj") || EndsWith(itemPath, L".fbx") || EndsWith(itemPath, L".dae"))
-			{
-				LoadMesh(itemPath);
-			}
+			{ LoadMesh(itemPath); }
 			else if (EndsWith(itemPath, L".jpg") || EndsWith(itemPath, L".png"))
-			{
-				LoadTexture(itemPath);
-			}
-			//else if (EndsWith(itemPath, L".dds"))
-			//{ LoadDDSTexture(itemPath); }
+			{ LoadTexture(itemPath); }
+			else if (EndsWith(itemPath, L".dds"))
+			{ LoadDDSTexture(itemPath, false, true); }
 			//else if (EndsWith(itemPath, L".spritefont"))
 			//{ LoadSpriteFont(itemPath); }
 			else if (EndsWith(itemPath, L".rootsig"))
@@ -89,6 +86,8 @@ void Assets::LoadAllAssets()
 			{ pipelinePaths.push_back(itemPath); }
 			else if (EndsWith(itemPath, L".material"))
 			{ materialPaths.push_back(itemPath); }
+			else if (EndsWith(itemPath, L".sky"))
+			{ skyPaths.push_back(itemPath); }
 		}
 	}
 
@@ -117,6 +116,12 @@ void Assets::LoadAllAssets()
 	for (auto& mPath : materialPaths)
 	{
 		LoadMaterial(mPath);
+	}
+
+	// Load all skies
+	for (auto& sPath : skyPaths)
+	{
+		LoadSky(sPath);
 	}
 }
 //
@@ -310,6 +315,28 @@ std::shared_ptr<Material> Assets::GetMaterial(std::wstring name)
 	// Unsuccessful
 	return 0;
 }
+std::shared_ptr<Sky> Assets::GetSky(std::wstring name)
+{
+	// Search and return mesh if found
+	auto it = skies.find(name);
+	if (it != skies.end())
+		return it->second;
+
+	// Attempt to load on-demand?
+	if (allowOnDemandLoading)
+	{
+		// See if the file exists and attempt to load
+		std::wstring filePath = FixPath(rootAssetPath + name + L".sky");
+		if (std::filesystem::exists(filePath))
+		{
+			// Do the load now and return the result
+			return LoadSky(filePath);
+		}
+	}
+
+	// Unsuccessful
+	return 0;
+}
 unsigned int Assets::GetMeshCount() { return (unsigned int)meshes.size(); }
 unsigned int Assets::GetTextureCount() { return (unsigned int)textures.size(); }
 unsigned int Assets::GetRootSigCount() { return (unsigned int)rootSigs.size(); }
@@ -317,6 +344,7 @@ unsigned int Assets::GetPipelineStateCount() { return (unsigned int)pipelineStat
 unsigned int Assets::GetPixelShaderCount() { return (unsigned int)pixelShaders.size(); }
 unsigned int Assets::GetVertexShaderCount() { return (unsigned int)vertexShaders.size(); }
 unsigned int Assets::GetMaterialCount() { return (unsigned int)materials.size(); }
+unsigned int Assets::GetSkyCount() { return (unsigned int)skies.size(); }
 //
 //	MODIFIERS
 //
@@ -327,6 +355,7 @@ void Assets::AddPipelineState(std::wstring name, Microsoft::WRL::ComPtr<ID3D12Pi
 void Assets::AddPixelShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> ps) { pixelShaders.insert({ name, ps }); }
 void Assets::AddVertexShader(std::wstring name, Microsoft::WRL::ComPtr<ID3DBlob> vs) { vertexShaders.insert({ name, vs }); }
 void Assets::AddMaterial(std::wstring name, std::shared_ptr<Material> material) { materials.insert({ name, material }); }
+void Assets::AddSky(std::wstring name, std::shared_ptr<Sky> sky) { skies.insert({ name, sky }); }
 //
 //	PRIVATE LOADING FUNCTIONS
 //
@@ -834,7 +863,6 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 
 	return rootSignature;
 }
-
 Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstring path)
 {
 	// Strip out everything before and including the asset root path
@@ -1065,7 +1093,6 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 
 	return pipelineState;
 }
-
 void Assets::LoadUnknownShader(std::wstring path)
 {
 	// Load the file into a blob
@@ -1237,6 +1264,94 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 	mat->FinalizeMaterial();
 	materials.insert({ filename, mat });
 	return mat;
+}
+
+std::shared_ptr<Sky> Assets::LoadSky(std::wstring path)
+{
+	// Strip out everything before and including the asset root path
+	size_t assetPathLength = rootAssetPath.size();
+	size_t assetPathPosition = path.rfind(rootAssetPath);
+	std::wstring filename = path.substr(assetPathPosition + assetPathLength);
+
+	if (printLoadingProgress)
+	{
+		printf("Loading sky: ");
+		wprintf(filename.c_str());
+		printf("\n");
+	}
+
+	// Open the file and parse
+	std::ifstream file(path);
+	json d = json::parse(file);
+	file.close();
+
+	// Remove the file extension the end of the filename before using as a key
+	filename = RemoveFileExtension(filename);
+
+	// Verify required members (texture)
+	if (d.is_discarded() ||
+		!d.contains("texture"))
+	{
+		return 0;
+	}
+
+	// Do we know about this texture?
+	std::wstring textureName = NarrowToWide(d["texture"].get<std::string>());
+	D3D12_CPU_DESCRIPTOR_HANDLE texture = GetTexture(textureName, false, true);
+
+	// We have enough to make the sky
+	//Sky asd = Sky(texture);
+	std::shared_ptr<Sky> sky = std::make_shared<Sky>(texture);
+
+	// Check for tint
+	DirectX::XMFLOAT4 tint(1, 1, 1, 1);
+	if (d.contains("tint") && (d["tint"].size() == 4 || d["tint"].size() == 3))
+	{
+		tint.x = d["tint"][0].get<float>();
+		tint.y = d["tint"][1].get<float>();
+		tint.z = d["tint"][2].get<float>();
+		tint.w = 1.f;
+	}
+	sky->SetColorTint(tint);
+
+	// Check for lights
+	if (d.contains("lights"))
+	{
+		for (unsigned int t = 0; t < d["lights"].size(); t++)
+		{
+			Light light = {};
+			light.Type = LIGHT_TYPE_DIRECTIONAL;
+
+			// Check for color
+			DirectX::XMFLOAT3 color(1, 1, 1);
+			if (d["lights"][t].contains("color") && d["lights"][t]["color"].size() == 3)
+			{
+				color.x = d["lights"][t]["color"][0].get<float>() * tint.x;
+				color.y = d["lights"][t]["color"][1].get<float>() * tint.y;
+				color.z = d["lights"][t]["color"][2].get<float>() * tint.z;
+			}
+			light.Color = color;
+
+			// Check for direction
+			DirectX::XMFLOAT3 dir(0, 1, 0);
+			if (d["lights"][t].contains("direction") && d["lights"][t]["direction"].size() == 3)
+			{
+				dir.x = d["lights"][t]["direction"][0].get<float>();
+				dir.y = d["lights"][t]["direction"][1].get<float>();
+				dir.z = d["lights"][t]["direction"][2].get<float>();
+			}
+			light.Direction = dir;
+
+			float intensity = 1.f;
+			if (d["lights"][t].contains("intensity")) { intensity = d["lights"][t]["intensity"].get<float>(); }
+			light.Intensity = intensity;
+
+			sky->AddLight(light);
+		}
+	}
+
+	skies.insert({ filename, sky });
+	return sky;
 }
 
 

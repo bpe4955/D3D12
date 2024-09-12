@@ -94,18 +94,17 @@ void Game::CreateBasicEntities()
 		materials[i % materials.size()])); i++;
 	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/torus"),
 		materials[i % materials.size()])); i++;
-	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Models/Pikachu(Gigantamax)"),
-		materials[i % materials.size()])); i++;
-
-	entities.back()->GetTransform()->SetScale(0.025f);
-	entities.back()->GetTransform()->SetRotation(XMFLOAT3(XM_PIDIV2, 0, 0));
+	//entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Models/Pikachu(Gigantamax)"),
+	//	materials[i % materials.size()])); i++;
+	//entities.back()->GetTransform()->SetScale(0.025f);
+	//entities.back()->GetTransform()->SetRotation(XMFLOAT3(XM_PIDIV2, 0, 0));
 
 	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/sphere"),
 		materials[0]));
 	entities.back()->GetTransform()->SetScale(0.5f);
 	entities.back()->GetTransform()->SetParent(entities[0]->GetTransform().get(), true);
-
-	skyBox = std::make_unique<Sky>(Sky(L"Textures/Skies/Planet"));
+	
+	skyBox = assets.GetSky(L"Skies/planet");
 }
 
 void Game::CreateLights()
@@ -119,49 +118,55 @@ void Game::CreateLights()
 	change.Color = XMFLOAT3(1.0f, 1.0f, 1.0f);
 	change.Intensity = 0.5f;
 	change.Range = 5.f;
-	change.SpotFalloff = 25.f;
+	change.SpotFalloff = 20.f;
+	lights.push_back(change);
 
-	Light dir = {};
-	dir.Type = LIGHT_TYPE_DIRECTIONAL;
-	dir.Direction = XMFLOAT3(0, 1, -1);
-	dir.Color = XMFLOAT3(1.f, 0.f, 0.f);
-	dir.Intensity = 1.0f;
-
-	Light poi = {};
-	poi.Type = LIGHT_TYPE_POINT;
-	poi.Color = XMFLOAT3(0.0f, 0.0f, 1.0f);
-	poi.Intensity = 1.0f;
-	poi.Position = XMFLOAT3(10.0f, 0, 0);
-	poi.Range = 20.f;
-	
-	Light spot = {};
-	spot.Type = LIGHT_TYPE_SPOT;
-	spot.Direction = XMFLOAT3(0, 0, 1);
-	spot.Color = XMFLOAT3(0.f, 1.f, 0.f);
-	spot.Intensity = 1.0f;
-	spot.Position = XMFLOAT3(10, 0, -5.f);
-	spot.Range = 20.f;
-	spot.SpotFalloff = 500.f;
+	//Light dir = {};
+	//dir.Type = LIGHT_TYPE_DIRECTIONAL;
+	//dir.Direction = XMFLOAT3(0, 1, -1);
+	//dir.Color = XMFLOAT3(1.f, 0.f, 0.f);
+	//dir.Intensity = 1.0f;
+	//
+	//Light poi = {};
+	//poi.Type = LIGHT_TYPE_POINT;
+	//poi.Color = XMFLOAT3(0.0f, 0.0f, 1.0f);
+	//poi.Intensity = 0.f;
+	//poi.Position = XMFLOAT3(10.0f, 0, 0);
+	//poi.Range = 20.f;
+	//
+	//Light spot = {};
+	//spot.Type = LIGHT_TYPE_SPOT;
+	//spot.Direction = XMFLOAT3(0, 0, 1);
+	//spot.Color = XMFLOAT3(0.f, 1.f, 0.f);
+	//spot.Intensity = 0.f;
+	//spot.Position = XMFLOAT3(10, 0, -5.f);
+	//spot.Range = 20.f;
+	//spot.SpotFalloff = 500.f;
 
 	// Add light to the list
-	lights.push_back(change);
-	lights.push_back(dir);
-	lights.push_back(poi);
-	lights.push_back(spot);
+	//lights.push_back(dir);
+	//lights.push_back(poi);
+	//lights.push_back(spot);
+	std::vector<Light> skyLights = skyBox->GetLights();
+	for (int i = 0; i < skyLights.size(); i++)
+	{
+		lights.push_back(skyLights[i]);
+	}
 
 	// Create the rest of the lights
 	while (lights.size() < MAX_LIGHTS)
 	{
 		Light point = {};
 		point.Type = LIGHT_TYPE_POINT;
-		point.Position = XMFLOAT3(RandomRange(-15.0f, 15.0f), RandomRange(-2.0f, 5.0f), RandomRange(-15.0f, 15.0f));
+		point.Position = XMFLOAT3(RandomRange(-5.0f, entities.size() * 5.0f), RandomRange(-5.0f, 5.0f), RandomRange(-5.0f, 5.0f));
 		point.Color = XMFLOAT3(RandomRange(0, 1), RandomRange(0, 1), RandomRange(0, 1));
 		point.Range = RandomRange(5.0f, 10.0f);
-		point.Intensity = RandomRange(0.01f, 0.12f);
+		point.Intensity = RandomRange(0.01f, 0.05f);
 	
 		// Add to the list
 		lights.push_back(point);
 	}
+	
 
 	// Make sure we're exactly MAX_LIGHTS big
 	lights.resize(MAX_LIGHTS);
@@ -200,7 +205,7 @@ void Game::Update(float deltaTime, float totalTime)
 	cameras[currentCameraIndex]->Update(deltaTime);
 
 	lights[0].Position = cameras[currentCameraIndex]->GetTransform()->GetPosition();
-	lights[0].Direction = cameras[currentCameraIndex]->GetTransform()->GetForward();
+	lights[0].Direction = MouseDirection();
 	//XMFLOAT3 camPos = cameras[currentCameraIndex]->GetTransform()->GetPosition();
 	//printf("Camera Position: %f, %f, %f \n", camPos.x, camPos.y, camPos.z);
 }
@@ -395,5 +400,40 @@ void Game::Draw(float deltaTime, float totalTime)
 
 }
 
+/// <summary>
+/// Gets an approximation of a direction vector to the mouse position.
+/// Derived from this code on stackoverflow: https://stackoverflow.com/questions/71731722/correct-way-to-generate-3d-world-ray-from-2d-mouse-coordinates
+/// </summary>
+/// <returns>An approximated direction vector, derived from the mouse's screen position</returns>
+DirectX::XMFLOAT3 Game::MouseDirection()
+{
+	float xpos = (float)Input::GetMouseX();
+	float ypos = (float)Input::GetMouseY();
 
+	// converts a position from the 2d xpos, ypos to a normalized 3d direction
+	float x = (2.0f * xpos) / Window::Width() - 1.0f;
+	float y = 1.0f - (2.0f * ypos) / Window::Height();
+	float z = 1.0f;
+	XMFLOAT3 ray_nds = XMFLOAT3(x, y, z);
+	XMFLOAT4 ray_clip = XMFLOAT4(ray_nds.x, ray_nds.y, ray_nds.z, 1.0f);
+
+	// eye space to clip we would multiply by projection so
+	// clip space to eye space is the inverse projection
+	XMFLOAT4X4 proj = cameras[currentCameraIndex]->GetProjection();
+	XMMATRIX invProj = DirectX::XMMatrixInverse(nullptr, XMLoadFloat4x4(&proj));
+	XMVECTOR rayEyeVec = XMVector4Transform(XMLoadFloat4(&ray_clip), invProj);
+
+	// world space to eye space is usually multiply by view so
+	// eye space to world space is inverse view
+	XMFLOAT4X4 view = cameras[currentCameraIndex]->GetView();
+	XMMATRIX viewMatInv = DirectX::XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));
+
+	// Convert float4 to float3 and normalize
+	XMFLOAT4 inv_ray_wor;
+	XMStoreFloat4(&inv_ray_wor, XMVector4Transform(rayEyeVec, viewMatInv));
+	XMFLOAT3 ray_wor = XMFLOAT3(inv_ray_wor.x, inv_ray_wor.y, inv_ray_wor.z);
+	XMVECTOR ray_wor_vec = XMVector3Normalize(XMLoadFloat3(&ray_wor));
+	XMStoreFloat3(&ray_wor, ray_wor_vec);
+	return ray_wor;
+}
 

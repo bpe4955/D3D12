@@ -4,11 +4,15 @@
 #include <DirectXMath.h>
 #include "Mesh.h"
 #include <memory>
+#include <vector>
+#include "BufferStructs.h"
 class Sky
 {
 public:
 	Sky(std::wstring filePath,
 		DirectX::XMFLOAT4 _colorTint = DirectX::XMFLOAT4(1.f,1.f,1.f,1.f));
+	Sky(D3D12_CPU_DESCRIPTOR_HANDLE texture,
+		DirectX::XMFLOAT4 _colorTint = DirectX::XMFLOAT4(1.f, 1.f, 1.f, 1.f));
 	~Sky();
 
 	// Getters + Setters
@@ -17,6 +21,8 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState();
 	std::shared_ptr<Mesh> GetMesh();
 	D3D12_GPU_DESCRIPTOR_HANDLE GetTextureGPUHandle();
+	std::vector<Light> GetLights();
+	void AddLight(Light light);
 
 private:
 	// Pipeline state, which can be shared among Skys
@@ -27,6 +33,7 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE textureGPUHandle;
 
 	DirectX::XMFLOAT4 colorTint;
+	std::vector<Light> lights;
 
 };
 

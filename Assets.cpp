@@ -1354,6 +1354,220 @@ std::shared_ptr<Sky> Assets::LoadSky(std::wstring path)
 	return sky;
 }
 
+std::shared_ptr<Scene> Assets::LoadScene(std::wstring path)
+{
+	path = FixPath(rootAssetPath + path + L".scene");
+
+	// Strip out everything before and including the asset root path
+	size_t assetPathLength = rootAssetPath.size();
+	size_t assetPathPosition = path.rfind(rootAssetPath);
+	std::wstring filename = path.substr(assetPathPosition + assetPathLength);
+
+	if (printLoadingProgress)
+	{
+		printf("Loading scene: ");
+		wprintf(filename.c_str());
+		printf("\n");
+	}
+
+	// Open the file and parse
+	std::ifstream file(path);
+	json sceneJson = json::parse(file);
+	file.close();
+
+	// Remove the file extension the end of the filename before using as a key
+	filename = RemoveFileExtension(filename);
+
+	// Check for name
+	std::string name = "Scene";
+	if (sceneJson.contains("name"))
+	{
+		name = sceneJson["name"].get<std::string>();
+	}
+
+	// Create the scene
+	std::shared_ptr<Scene> scene = std::make_shared<Scene>(name);
+
+
+	// Check for cameras
+	if (sceneJson.contains("cameras") && sceneJson["cameras"].is_array())
+	{
+		//scene->AddCamera(Camera::Parse(sceneJson["cameras"][c]));
+		for (int c = 0; c < sceneJson["cameras"].size(); c++)
+			scene->AddCamera(ParseCamera(sceneJson["cameras"][c]));
+	}
+	// Create a default camera if none were loaded
+	if (scene->GetCameras().size() == 0)
+	{
+		scene->AddCamera(std::make_shared<Camera>(0.0f, 0.0f, -5.0f, 5.0f, 0.001f, DirectX::XM_PIDIV2, 1.0f));
+	}
+	scene->SetCurrentCamera(0);
+
+	// Check for lights
+	if (sceneJson.contains("lights") && sceneJson["lights"].is_array())
+	{
+		for (int l = 0; l < sceneJson["lights"].size(); l++)
+			scene->AddLight(ParseLight(sceneJson["lights"][l]));
+	}
+
+	// Check for sky
+	if (sceneJson.contains("sky") && sceneJson["sky"].is_string())
+	{
+		scene->SetSky(GetSky(NarrowToWide(sceneJson["sky"].get<std::string>())));
+	}
+	std::vector skyLights = scene->GetSky()->GetLights();
+	for (int i = 0; i < skyLights.size(); i++) 
+		{ scene->AddLight(skyLights[i]); }
+
+	// Check for entities
+	if (sceneJson.contains("entities") && sceneJson["entities"].is_array())
+	{
+		for (int e = 0; e < sceneJson["entities"].size(); e++)
+		{
+			scene->AddEntity(ParseEntity(sceneJson["entities"][e]));
+
+			if (sceneJson["entities"][e].contains("transform")
+				&& sceneJson["entities"][e]["transform"].contains("parent")
+				&& sceneJson["entities"][e]["transform"]["parent"].is_number_integer())
+			{
+				int index = sceneJson["entities"][e]["transform"]["parent"].get<int>();
+				scene->GetEntities()[e]->GetTransform()->SetParent(
+					scene->GetEntities()[index]->GetTransform().get());
+			}
+		}
+
+	}
+
+	return scene;
+}
+
+std::shared_ptr<Camera> Assets::ParseCamera(nlohmann::json jsonCamera)
+{
+	// Defaults
+	CameraProjectionType projType = CameraProjectionType::Perspective;
+	float moveSpeed = 1.0f;
+	float lookSpeed = 0.01f;
+	float fov = DirectX::XM_PIDIV2;
+	float nearClip = 0.01f;
+	float farClip = 1000.0f;
+	DirectX::XMFLOAT3 pos = { 0, 0, -5 };
+	DirectX::XMFLOAT3 rot = { 0, 0, 0 };
+
+	// Check for each type of data
+	if (jsonCamera.contains("type") && jsonCamera["type"].get<std::string>() == "orthographic")
+		projType = CameraProjectionType::Orthographic;
+
+	if (jsonCamera.contains("moveSpeed")) moveSpeed = jsonCamera["moveSpeed"].get<float>();
+	if (jsonCamera.contains("lookSpeed")) lookSpeed = jsonCamera["lookSpeed"].get<float>();
+	if (jsonCamera.contains("fov")) fov = jsonCamera["fov"].get<float>();
+	if (jsonCamera.contains("near")) nearClip = jsonCamera["near"].get<float>();
+	if (jsonCamera.contains("far")) farClip = jsonCamera["far"].get<float>();
+	if (jsonCamera.contains("position") && jsonCamera["position"].size() == 3)
+	{
+		pos.x = jsonCamera["position"][0].get<float>();
+		pos.y = jsonCamera["position"][1].get<float>();
+		pos.z = jsonCamera["position"][2].get<float>();
+	}
+	if (jsonCamera.contains("rotation") && jsonCamera["rotation"].size() == 3)
+	{
+		rot.x = jsonCamera["rotation"][0].get<float>();
+		rot.y = jsonCamera["rotation"][1].get<float>();
+		rot.z = jsonCamera["rotation"][2].get<float>();
+	}
+
+	// Create the camera
+	std::shared_ptr<Camera> cam = std::make_shared<Camera>(
+		pos, moveSpeed, lookSpeed, fov, 1.0f, nearClip, farClip, projType);
+	cam->GetTransform()->SetRotation(rot);
+
+	return cam;
+}
+
+Light Assets::ParseLight(nlohmann::json jsonLight)
+{
+	// Set defaults
+	Light light = {};
+
+	// Check data
+	if (jsonLight.contains("type"))
+	{
+		if (jsonLight["type"].get<std::string>() == "directional") light.Type = LIGHT_TYPE_DIRECTIONAL;
+		else if (jsonLight["type"].get<std::string>() == "point") light.Type = LIGHT_TYPE_POINT;
+		else if (jsonLight["type"].get<std::string>() == "spot") light.Type = LIGHT_TYPE_SPOT;
+	}
+
+	if (jsonLight.contains("direction") && jsonLight["direction"].size() == 3)
+	{
+		light.Direction.x = jsonLight["direction"][0].get<float>();
+		light.Direction.y = jsonLight["direction"][1].get<float>();
+		light.Direction.z = jsonLight["direction"][2].get<float>();
+	}
+
+	if (jsonLight.contains("position") && jsonLight["position"].size() == 3)
+	{
+		light.Position.x = jsonLight["position"][0].get<float>();
+		light.Position.y = jsonLight["position"][1].get<float>();
+		light.Position.z = jsonLight["position"][2].get<float>();
+	}
+
+	if (jsonLight.contains("color") && jsonLight["color"].size() == 3)
+	{
+		light.Color.x = jsonLight["color"][0].get<float>();
+		light.Color.y = jsonLight["color"][1].get<float>();
+		light.Color.z = jsonLight["color"][2].get<float>();
+	}
+
+	if (jsonLight.contains("intensity")) light.Intensity = jsonLight["intensity"].get<float>();
+	if (jsonLight.contains("range")) light.Range = jsonLight["range"].get<float>();
+	if (jsonLight.contains("spotFalloff")) light.SpotFalloff = jsonLight["spotFalloff"].get<float>();
+
+	return light;
+}
+
+std::shared_ptr<Entity> Assets::ParseEntity(nlohmann::json jsonEntity)
+{
+	Assets& assets = Assets::GetInstance();
+
+	std::shared_ptr<Entity> entity = std::make_shared<Entity>(
+		assets.GetMesh(NarrowToWide(jsonEntity["mesh"].get<std::string>())),
+		assets.GetMaterial(NarrowToWide(jsonEntity["material"].get<std::string>())));
+
+	// Early out if transform is missing
+	if (!jsonEntity.contains("transform")) return entity;
+	nlohmann::json tr = jsonEntity["transform"];
+
+	// Handle transform
+	DirectX::XMFLOAT3 pos = { 0, 0, 0 };
+	DirectX::XMFLOAT3 rot = { 0, 0, 0 };
+	DirectX::XMFLOAT3 sc = { 1, 1, 1 };
+
+	if (tr.contains("position") && tr["position"].size() == 3)
+	{
+		pos.x = tr["position"][0].get<float>();
+		pos.y = tr["position"][1].get<float>();
+		pos.z = tr["position"][2].get<float>();
+	}
+
+	if (tr.contains("rotation") && tr["rotation"].size() == 3)
+	{
+		rot.x = tr["rotation"][0].get<float>();
+		rot.y = tr["rotation"][1].get<float>();
+		rot.z = tr["rotation"][2].get<float>();
+	}
+
+	if (tr.contains("scale") && tr["scale"].size() == 3)
+	{
+		sc.x = tr["scale"][0].get<float>();
+		sc.y = tr["scale"][1].get<float>();
+		sc.z = tr["scale"][2].get<float>();
+	}
+
+	entity->GetTransform()->SetPosition(pos);
+	entity->GetTransform()->SetRotation(rot);
+	entity->GetTransform()->SetScale(sc);
+	return entity;
+}
+
 
 
 // Helpers for determining the actual path to the executable

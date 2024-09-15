@@ -1,0 +1,87 @@
+{
+    "name"      : "basicScene",
+    "sky"       : "Skies/planet",
+    "cameras"   :
+    [
+        {
+            "type"      : "perspective",
+            "position"  : [0,0,-5.0],
+            "rotation"  : [0,0,0],
+            "moveSpeed" : 1,
+            "lookSpeed" : 0.0075
+        }
+    ],
+    "lights"    :
+    [
+        {
+            "type"      : "spot",
+            "color"     : [1,1,1],
+            "intensity" : 0.5,
+            "range"     : 5,
+            "spotFalloff":20
+        }
+    ],
+    "entities"  : 
+    [
+        {
+            "mesh"      : "Basic Meshes/sphere",
+            "material"  : "Materials/cobblestone",
+            "transform" :
+            {
+                "position"  : [-10, 0, 0]
+            }
+        },
+        {
+            "mesh"      : "Basic Meshes/cube",
+            "material"  : "Materials/bronze",
+            "transform" :
+            {
+                "position"  : [-5, 0, 0]
+            }
+        },
+        {
+            "mesh"      : "Basic Meshes/helix",
+            "material"  : "Materials/scratched",
+            "transform" :
+            {
+                "position"  : [0, 0, 0]
+            }
+        },
+        {
+            "mesh"      : "Basic Meshes/cylinder",
+            "material"  : "Materials/cobblestone",
+            "transform" :
+            {
+                "position"  : [5, 0, 0]
+            }
+        },
+        {
+            "mesh"      : "Basic Meshes/torus",
+            "material"  : "Materials/bronze",
+            "transform" :
+            {
+                "position"  : [10, 0, 0]
+            }
+        },
+        {
+            "mesh"      : "Basic Meshes/cube",
+            "material"  : "Materials/cobblestone",
+            "transform" :
+            {
+                "position"  : [0, -5, 0],
+                "scale"     : [15,1,10]
+            }
+        },
+        {
+            "mesh"      : "Basic Meshes/sphere",
+            "material"  : "Materials/cobblestone",
+            "transform" :
+            {
+                "position"  : [1, 1, 0],
+                "scale"     : [0.5,0.5,0.5],
+                "parent"    : 0
+            }
+        }
+        
+    ]
+}

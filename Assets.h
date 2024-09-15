@@ -12,6 +12,7 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "Sky.h"
+#include "Scene.h"
 
 
 class Assets
@@ -84,6 +85,7 @@ public:
 	void AddSky(std::wstring name, std::shared_ptr<Sky> sky);
 
 
+	std::shared_ptr<Scene> LoadScene(std::wstring path);
 private:
 	// Variables
 	std::wstring rootAssetPath;
@@ -121,6 +123,9 @@ private:
 	Microsoft::WRL::ComPtr<ID3DBlob> LoadVertexShader(std::wstring path);
 	std::shared_ptr<Material> LoadMaterial(std::wstring path);
 	std::shared_ptr<Sky> LoadSky(std::wstring path);
+	std::shared_ptr<Camera> ParseCamera(nlohmann::json jsonCamera);
+	Light ParseLight(nlohmann::json jsonLight);
+	std::shared_ptr<Entity> ParseEntity(nlohmann::json jsonEntity);
 
 	/// Helpers for determining the actual path to the executable
 	/// Written By vixorien https://github.dev/vixorien/ggp-advanced-demos

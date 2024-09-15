@@ -8,6 +8,7 @@
 #include "Camera.h"
 #include "Entity.h"
 #include "Sky.h"
+#include "Scene.h"
 
 class Game
 {
@@ -29,8 +30,6 @@ private:
 	// Initialization helper methods - feel free to customize, combine, remove, etc.
 	//void LoadShaders();
 	void LoadAssets();
-	void CreateBasicMaterials();
-	void CreateBasicEntities();
 	void CreateLights();
 
 	// Note the usage of ComPtr below
@@ -38,14 +37,8 @@ private:
 	//     Component Object Model, which DirectX objects do
 	//  - More info here: https://github.com/Microsoft/DirectXTK/wiki/ComPtr
 
-	// Ideally later move this into a Scene object
-	std::vector<std::shared_ptr<Camera>> cameras;
+	std::shared_ptr<Scene> scene;
 	unsigned int currentCameraIndex;
-
-	std::vector<std::shared_ptr<Material>> materials;
-	std::vector<std::shared_ptr<Entity>> entities;
-	std::vector<Light> lights;
-	std::shared_ptr<Sky> skyBox;
 
 	// Helper Functions
 	DirectX::XMFLOAT3 MouseDirection();

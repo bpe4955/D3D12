@@ -27,19 +27,7 @@ using namespace DirectX;
 void Game::Initialize()
 {
 	LoadAssets();
-	
-	// Helper methods for loading shaders, creating some basic
-	// geometry to draw and some simple camera matrices.
-	// - You'll be expanding and/or replacing these later
-	CreateBasicMaterials();
-	CreateBasicEntities();
 	CreateLights();
-
-	// Set up camera
-	{
-		cameras.push_back(std::make_shared<Camera>(XMFLOAT3(10, 0.75, -5.0f), 1.0f, 0.01f, 90.0f, Window::AspectRatio()));
-		currentCameraIndex = 0;
-	}
 
 	// Ensure the command list is closed going into Draw for the first time
 	Graphics::commandList->Close();
@@ -66,110 +54,31 @@ void Game::LoadAssets()
 	//       found in the asstes folder, but "load on demand" is more efficient
 	Assets::GetInstance().Initialize(L"../../Assets/", L"./",
 		Graphics::Device, true);
-}
 
-
-void Game::CreateBasicMaterials()
-{
-	Assets& assets = Assets::GetInstance();
-	// Create materials
-	// Note: Samplers are handled by a single static sampler in the
-	// root signature for this demo, rather than per-material
-	materials.push_back(assets.GetMaterial(L"Materials/cobblestone"));
-	materials.push_back(assets.GetMaterial(L"Materials/bronze"));
-	materials.push_back(assets.GetMaterial(L"Materials/scratched"));
-}
-
-void Game::CreateBasicEntities()
-{
-	Assets& assets = Assets::GetInstance();
-	int i = 0;
-	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/sphere"), 
-		materials[i % materials.size()])); i++;
-	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/cube"),
-		materials[i % materials.size()])); i++;
-	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/helix"),
-		materials[i % materials.size()])); i++;
-	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/cylinder"),
-		materials[i % materials.size()])); i++;
-	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/torus"),
-		materials[i % materials.size()])); i++;
-	//entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Models/Pikachu(Gigantamax)"),
-	//	materials[i % materials.size()])); i++;
-	//entities.back()->GetTransform()->SetScale(0.025f);
-	//entities.back()->GetTransform()->SetRotation(XMFLOAT3(XM_PIDIV2, 0, 0));
-
-	entities.push_back(std::make_shared<Entity>(assets.GetMesh(L"Basic Meshes/sphere"),
-		materials[0]));
-	entities.back()->GetTransform()->SetScale(0.5f);
-	entities.back()->GetTransform()->SetParent(entities[0]->GetTransform().get(), true);
-	
-	skyBox = assets.GetSky(L"Skies/planet");
+	// Load a scene json file
+	scene = Assets::GetInstance().LoadScene(L"Scenes/basicScene");
+	currentCameraIndex = 0;
+	scene->GetCurrentCamera()->UpdateProjectionMatrix(Window::AspectRatio());
 }
 
 void Game::CreateLights()
 {
-	// Reset
-	lights.clear();
-
-	// Setup lights
-	Light change = {};
-	change.Type = LIGHT_TYPE_SPOT;
-	change.Color = XMFLOAT3(1.0f, 1.0f, 1.0f);
-	change.Intensity = 0.5f;
-	change.Range = 5.f;
-	change.SpotFalloff = 20.f;
-	lights.push_back(change);
-
-	//Light dir = {};
-	//dir.Type = LIGHT_TYPE_DIRECTIONAL;
-	//dir.Direction = XMFLOAT3(0, 1, -1);
-	//dir.Color = XMFLOAT3(1.f, 0.f, 0.f);
-	//dir.Intensity = 1.0f;
-	//
-	//Light poi = {};
-	//poi.Type = LIGHT_TYPE_POINT;
-	//poi.Color = XMFLOAT3(0.0f, 0.0f, 1.0f);
-	//poi.Intensity = 0.f;
-	//poi.Position = XMFLOAT3(10.0f, 0, 0);
-	//poi.Range = 20.f;
-	//
-	//Light spot = {};
-	//spot.Type = LIGHT_TYPE_SPOT;
-	//spot.Direction = XMFLOAT3(0, 0, 1);
-	//spot.Color = XMFLOAT3(0.f, 1.f, 0.f);
-	//spot.Intensity = 0.f;
-	//spot.Position = XMFLOAT3(10, 0, -5.f);
-	//spot.Range = 20.f;
-	//spot.SpotFalloff = 500.f;
-
-	// Add light to the list
-	//lights.push_back(dir);
-	//lights.push_back(poi);
-	//lights.push_back(spot);
-	std::vector<Light> skyLights = skyBox->GetLights();
-	for (int i = 0; i < skyLights.size(); i++)
-	{
-		lights.push_back(skyLights[i]);
-	}
-
-	// Create the rest of the lights
-	while (lights.size() < MAX_LIGHTS)
+	// Create extra lights
+	while (scene->GetLights().size() < MAX_LIGHTS)
 	{
 		Light point = {};
 		point.Type = LIGHT_TYPE_POINT;
-		point.Position = XMFLOAT3(RandomRange(-5.0f, entities.size() * 5.0f), RandomRange(-5.0f, 5.0f), RandomRange(-5.0f, 5.0f));
+		point.Position = XMFLOAT3(RandomRange(-15.0f, 15.0f), RandomRange(-5.0f, 5.0f), RandomRange(-5.0f, 5.0f));
 		point.Color = XMFLOAT3(RandomRange(0, 1), RandomRange(0, 1), RandomRange(0, 1));
-		point.Range = RandomRange(5.0f, 10.0f);
-		point.Intensity = RandomRange(0.01f, 0.05f);
-	
+		point.Range = RandomRange(2.0f, 10.0f);
+		point.Intensity = RandomRange(0.01f, 0.25f);
+
 		// Add to the list
-		lights.push_back(point);
+		scene->AddLight(point);
 	}
 	
-
 	// Make sure we're exactly MAX_LIGHTS big
-	lights.resize(MAX_LIGHTS);
+	scene->GetLights().resize(MAX_LIGHTS);
 }
 
 
@@ -179,7 +88,10 @@ void Game::CreateLights()
 // --------------------------------------------------------
 void Game::OnResize()
 {
-	for (std::shared_ptr<Camera> camPtr : cameras)
+	if (!scene.get()) return;
+	if (!scene->GetCameras()[0]) return;
+
+	for (std::shared_ptr<Camera> camPtr : scene->GetCameras())
 	{
 		camPtr->UpdateProjectionMatrix(Window::AspectRatio());
 	}
@@ -195,19 +107,29 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::KeyDown(VK_ESCAPE))
 		Window::Quit();
 
-	for (int i = 0; i < entities.size()-1; i++)
+	if(scene->GetName() == "basicScene")
 	{
-		entities[i]->GetTransform()->SetPosition(
-			XMFLOAT3((float)i * 5, (float)sin(i + totalTime), 0));
+		// Entities
+		std::vector<std::shared_ptr<Entity>> entities = scene->GetEntities();
+
+		for (int i = 0; i < 5; i++)
+		{
+			XMFLOAT3 pos = entities[i]->GetTransform()->GetPosition();
+			entities[i]->GetTransform()->SetPosition(
+				XMFLOAT3(pos.x, (float)sin(i + totalTime), pos.z));
+		}
+		entities.back()->GetTransform()->SetPosition(XMFLOAT3((float)sin(totalTime), 1, (float)cos(totalTime)));
+
+		// Camera
+		std::shared_ptr<Camera> currentCamera = scene->GetCurrentCamera();
+		currentCamera->Update(deltaTime);
+		//XMFLOAT3 camPos = currentCamera->GetTransform()->GetPosition();
+		//printf("Camera Position: %f, %f, %f \n", camPos.x, camPos.y, camPos.z);
+
+		// Lights
+		scene->GetLights()[0].Position = currentCamera->GetTransform()->GetPosition();
+		scene->GetLights()[0].Direction = MouseDirection();
 	}
-	entities.back()->GetTransform()->SetPosition(XMFLOAT3((float)sin(totalTime), 1, (float)cos(totalTime)));
-
-	cameras[currentCameraIndex]->Update(deltaTime);
-
-	lights[0].Position = cameras[currentCameraIndex]->GetTransform()->GetPosition();
-	lights[0].Direction = MouseDirection();
-	//XMFLOAT3 camPos = cameras[currentCameraIndex]->GetTransform()->GetPosition();
-	//printf("Camera Position: %f, %f, %f \n", camPos.x, camPos.y, camPos.z);
 }
 
 
@@ -266,6 +188,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		Graphics::commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
 		Graphics::commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		// Draw
+		std::vector<std::shared_ptr<Entity>> entities = scene->GetEntities();;
 		for (std::shared_ptr<Entity> entityPtr : entities)
 		{
 			// Vertex Data
@@ -274,8 +197,8 @@ void Game::Draw(float deltaTime, float totalTime)
 				VertexShaderData data = {};
 				data.world = entityPtr->GetTransform()->GetWorldMatrix();
 				data.worldInvTranspose = entityPtr->GetTransform()->GetWorldInverseTransposeMatrix();
-				data.view = cameras[currentCameraIndex]->GetView();
-				data.proj = cameras[currentCameraIndex]->GetProjection();
+				data.view = scene->GetCurrentCamera()->GetView();
+				data.proj = scene->GetCurrentCamera()->GetProjection();
 				// Use FillNextConstantBufferAndGetGPUDescriptorHandle() 
 				// to copy the above struct to the GPU and get back the corresponding handle to the constant buffer view.
 				D3D12_GPU_DESCRIPTOR_HANDLE handle =
@@ -292,9 +215,9 @@ void Game::Draw(float deltaTime, float totalTime)
 				psData.colorTint = mat->GetColorTint();
 				psData.uvScale = mat->GetUVScale();
 				psData.uvOffset = mat->GetUVOffset();
-				psData.cameraPosition = cameras[currentCameraIndex]->GetTransform()->GetPosition();
-				psData.lightCount = (int)lights.size();
-				memcpy(psData.lights, &lights[0], sizeof(Light) * MAX_LIGHTS);
+				psData.cameraPosition = scene->GetCurrentCamera()->GetTransform()->GetPosition();
+				psData.lightCount = (int)scene->GetLights().size();
+				memcpy(psData.lights, &scene->GetLights()[0], sizeof(Light) * MAX_LIGHTS);
 
 				// Send this to a chunk of the constant buffer heap
 				// and grab the GPU handle for it so we can set it for this draw
@@ -333,8 +256,8 @@ void Game::Draw(float deltaTime, float totalTime)
 			{
 				// Fill out a SkyVSData struct with the camera’s matrices.
 				SkyVSData data = {};
-				data.view = cameras[currentCameraIndex]->GetView();
-				data.proj = cameras[currentCameraIndex]->GetProjection();
+				data.view = scene->GetCurrentCamera()->GetView();
+				data.proj = scene->GetCurrentCamera()->GetProjection();
 				// Use FillNextConstantBufferAndGetGPUDescriptorHandle() 
 				// to copy the above struct to the GPU and get back the corresponding handle to the constant buffer view.
 				D3D12_GPU_DESCRIPTOR_HANDLE handle =
@@ -346,7 +269,7 @@ void Game::Draw(float deltaTime, float totalTime)
 			// Pixel Shader
 			{
 				SkyPSData psData = {};
-				psData.colorTint = skyBox->GetColorTint();
+				psData.colorTint = scene->GetSky()->GetColorTint();
 		
 				// Send this to a chunk of the constant buffer heap
 				// and grab the GPU handle for it so we can set it for this draw
@@ -361,17 +284,17 @@ void Game::Draw(float deltaTime, float totalTime)
 			}
 			// Set the SRV descriptor handle for this sky's textures
 			// Note: This assumes that descriptor table 2 is for textures (as per our root sig)
-			Graphics::commandList->SetGraphicsRootDescriptorTable(2, skyBox->GetTextureGPUHandle());
+			Graphics::commandList->SetGraphicsRootDescriptorTable(2, scene->GetSky()->GetTextureGPUHandle());
 		
 			// Grab the vertex buffer view and index buffer view from this entity’s mesh
-			D3D12_INDEX_BUFFER_VIEW indexBuffView = skyBox->GetMesh()->GetIndexBufferView();
-			D3D12_VERTEX_BUFFER_VIEW vertexBuffView = skyBox->GetMesh()->GetVertexBufferView();
+			D3D12_INDEX_BUFFER_VIEW indexBuffView = scene->GetSky()->GetMesh()->GetIndexBufferView();
+			D3D12_VERTEX_BUFFER_VIEW vertexBuffView = scene->GetSky()->GetMesh()->GetVertexBufferView();
 			// Set them using IASetVertexBuffers() and IASetIndexBuffer()
 			Graphics::commandList->IASetIndexBuffer(&indexBuffView);
 			Graphics::commandList->IASetVertexBuffers(0, 1, &vertexBuffView);
 		
 			// Call DrawIndexedInstanced() using the index count of this entity’s mesh
-			Graphics::commandList->DrawIndexedInstanced(skyBox->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
+			Graphics::commandList->DrawIndexedInstanced(scene->GetSky()->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
 		}
 	}
 
@@ -419,13 +342,13 @@ DirectX::XMFLOAT3 Game::MouseDirection()
 
 	// eye space to clip we would multiply by projection so
 	// clip space to eye space is the inverse projection
-	XMFLOAT4X4 proj = cameras[currentCameraIndex]->GetProjection();
+	XMFLOAT4X4 proj = scene->GetCurrentCamera()->GetProjection();
 	XMMATRIX invProj = DirectX::XMMatrixInverse(nullptr, XMLoadFloat4x4(&proj));
 	XMVECTOR rayEyeVec = XMVector4Transform(XMLoadFloat4(&ray_clip), invProj);
 
 	// world space to eye space is usually multiply by view so
 	// eye space to world space is inverse view
-	XMFLOAT4X4 view = cameras[currentCameraIndex]->GetView();
+	XMFLOAT4X4 view = scene->GetCurrentCamera()->GetView();
 	XMMATRIX viewMatInv = DirectX::XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));
 
 	// Convert float4 to float3 and normalize

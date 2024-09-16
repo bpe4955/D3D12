@@ -9,16 +9,18 @@ using json = nlohmann::json;
 using namespace DirectX;
 
 // Constructor / Destructor
-Scene::Scene(std::string _name) : name(_name) {}
+Scene::Scene(std::string _name) : name(_name), opaqueEntitiesOrganized(false) {}
 Scene::~Scene() {}
 
 // Getters
 std::string Scene::GetName() { return name; }
 std::vector<std::shared_ptr<Entity>>& Scene::GetEntities() { return entities; }
+std::vector<std::shared_ptr<Entity>>& Scene::GetOpaqueEntities() { return opaqueEntities; }
 std::vector<Light>& Scene::GetLights() { return lights; }
 std::vector<std::shared_ptr<Camera>>& Scene::GetCameras() { return cameras; }
 std::shared_ptr<Camera> Scene::GetCurrentCamera() { return currentCamera; }
 std::shared_ptr<Sky> Scene::GetSky() { return sky; }
+bool Scene::OpaqueReady() { return opaqueEntitiesOrganized; }
 
 // Setters
 void Scene::SetName(std::string _name) { name = _name; }
@@ -47,5 +49,16 @@ void Scene::Clear()
 
 	currentCamera.reset();
 	sky.reset();
+}
+
+void Scene::InitialSort()
+{
+	opaqueEntities = entities;
+	std::sort(opaqueEntities.begin(), opaqueEntities.end(), [](const auto& e1, const auto& e2)
+		{
+			// Compare pointers to materials
+			return e1->GetMaterial() < e2->GetMaterial();
+		});
+	opaqueEntitiesOrganized = true;
 }
 

@@ -25,14 +25,18 @@ struct Light
     float3 Padding; // 64 bytes
 };
 
-cbuffer ExternalData : register(b0)
+cbuffer PerFrame : register(b0)
+{
+    float3 cameraPosition;
+    int lightCount;
+    Light lights[MAX_LIGHTS];
+}
+
+cbuffer PerMaterial : register(b1)
 {
     float4 colorTint;
     float2 uvScale;
     float2 uvOffset;
-    float3 cameraPosition;
-    int lightCount;
-    Light lights[MAX_LIGHTS];
 }
 
 // Texture related

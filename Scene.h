@@ -19,10 +19,12 @@ public:
 	// Getters
 	std::string GetName();
 	std::vector<std::shared_ptr<Entity>>& GetEntities();
+	std::vector<std::shared_ptr<Entity>>& GetOpaqueEntities();
 	std::vector<Light>& GetLights();
 	std::vector<std::shared_ptr<Camera>>& GetCameras();
 	std::shared_ptr<Camera> GetCurrentCamera();
 	std::shared_ptr<Sky> GetSky();
+	bool OpaqueReady();
 
 	// Setters
 	void SetName(std::string _name);
@@ -37,6 +39,7 @@ public:
 
 	// Functions
 	void Clear();
+	void InitialSort();
 
 private:
 	std::string name;
@@ -50,5 +53,8 @@ private:
 	std::shared_ptr<Camera> currentCamera;
 	std::shared_ptr<Sky> sky;
 
+	// For drawing
+	bool opaqueEntitiesOrganized;
+	std::vector<std::shared_ptr<Entity>> opaqueEntities;
 };
 

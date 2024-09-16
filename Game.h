@@ -26,7 +26,6 @@ public:
 	void OnResize();
 
 private:
-
 	// Initialization helper methods - feel free to customize, combine, remove, etc.
 	//void LoadShaders();
 	void LoadAssets();

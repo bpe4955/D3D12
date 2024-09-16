@@ -5,6 +5,8 @@
 #include <dxgi1_6.h>
 #include <string>
 #include <wrl/client.h>
+#include <memory>
+#include "Scene.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -42,4 +44,8 @@ namespace Graphics
 
 	// Debug Layer
 	void PrintDebugMessages();
+
+	// --- Renderer ---
+	void RenderSimple(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
+	void RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
 }

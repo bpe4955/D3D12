@@ -27,28 +27,32 @@ struct Light
 	DirectX::XMFLOAT3	Padding;	// 64 bytes
 };
 
-struct VertexShaderData
+
+// This needs to match the expected per-frame vertex shader data
+struct VSPerFrameData
+{
+	DirectX::XMFLOAT4X4 view;
+	DirectX::XMFLOAT4X4 projection;
+};
+
+struct VSPerObjectData
 {
 	DirectX::XMFLOAT4X4 world;
 	DirectX::XMFLOAT4X4 worldInvTranspose;
-	DirectX::XMFLOAT4X4 view;
-	DirectX::XMFLOAT4X4 proj;
 };
 
-struct SkyVSData
+struct PSPerFrameData
 {
-	DirectX::XMFLOAT4X4 view;
-	DirectX::XMFLOAT4X4 proj;
+	DirectX::XMFLOAT3 cameraPosition;
+	int lightCount;
+	Light lights[MAX_LIGHTS];
 };
 
-struct PixelShaderData
+struct PSPerMaterialData
 {
 	DirectX::XMFLOAT4 colorTint;
 	DirectX::XMFLOAT2 uvScale;
 	DirectX::XMFLOAT2 uvOffset;
-	DirectX::XMFLOAT3 cameraPosition;
-	int lightCount;
-	Light lights[MAX_LIGHTS];
 };
 
 struct SkyPSData

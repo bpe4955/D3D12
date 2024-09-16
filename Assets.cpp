@@ -680,21 +680,40 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 	}
 
 	// Root Signature
+	int numVertBuffDesc = 1;
+	int numPixBuffDesc = 1;
+	if (d.contains("numVertBuffDesc")) { numVertBuffDesc = d["numVertBuffDesc"].get<unsigned int>(); }
+	if (d.contains("numPixBuffDesc")) { numVertBuffDesc = d["numPixBuffDesc"].get<unsigned int>(); }
+
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
-	// Describe the range of CBVs needed for the vertex shader
-	D3D12_DESCRIPTOR_RANGE cbvRangeVS = {};
-	cbvRangeVS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	cbvRangeVS.NumDescriptors = 1;
-	cbvRangeVS.BaseShaderRegister = 0;
-	cbvRangeVS.RegisterSpace = 0;
-	cbvRangeVS.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	// Describe the range of CBVs needed for the pixel shader
-	D3D12_DESCRIPTOR_RANGE cbvRangePS = {};
-	cbvRangePS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	cbvRangePS.NumDescriptors = 1;
-	cbvRangePS.BaseShaderRegister = 0;
-	cbvRangePS.RegisterSpace = 0;
-	cbvRangePS.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	// Describe the range of CBVs needed for the vertex shader PER FRAME
+	D3D12_DESCRIPTOR_RANGE cbvRangeVSFrame = {};
+	cbvRangeVSFrame.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	cbvRangeVSFrame.NumDescriptors = 1;
+	cbvRangeVSFrame.BaseShaderRegister = 0;
+	cbvRangeVSFrame.RegisterSpace = 0;
+	cbvRangeVSFrame.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	// Describe the range of CBVs needed for the vertex shader PER OBJECT
+	D3D12_DESCRIPTOR_RANGE cbvRangeVSObj = {};
+	cbvRangeVSObj.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	cbvRangeVSObj.NumDescriptors = numVertBuffDesc;
+	cbvRangeVSObj.BaseShaderRegister = 1;
+	cbvRangeVSObj.RegisterSpace = 0;
+	cbvRangeVSObj.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	// Describe the range of CBVs needed for the pixel shader PER FRAME
+	D3D12_DESCRIPTOR_RANGE cbvRangePSFrame = {};
+	cbvRangePSFrame.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	cbvRangePSFrame.NumDescriptors = 1;
+	cbvRangePSFrame.BaseShaderRegister = 0;
+	cbvRangePSFrame.RegisterSpace = 0;
+	cbvRangePSFrame.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	// Describe the range of CBVs needed for the pixel shader PER MATERIAL
+	D3D12_DESCRIPTOR_RANGE cbvRangePSMat = {};
+	cbvRangePSMat.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	cbvRangePSMat.NumDescriptors = numPixBuffDesc;
+	cbvRangePSMat.BaseShaderRegister = 1;
+	cbvRangePSMat.RegisterSpace = 0;
+	cbvRangePSMat.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	UINT numDescriptors = 4;
 	UINT baseShaderRegister = 0;
@@ -709,22 +728,30 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 	srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// Create the root parameters
-	D3D12_ROOT_PARAMETER rootParams[3] = {};
+	D3D12_ROOT_PARAMETER rootParams[5] = {};
 	// CBV table param for vertex shader
 	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
-	rootParams[0].DescriptorTable.pDescriptorRanges = &cbvRangeVS;
-	// CBV table param for pixel shader
+	rootParams[0].DescriptorTable.pDescriptorRanges = &cbvRangeVSFrame;
 	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 	rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
-	rootParams[1].DescriptorTable.pDescriptorRanges = &cbvRangePS;
-	// SRV table param
+	rootParams[1].DescriptorTable.pDescriptorRanges = &cbvRangeVSObj;
+	// CBV table param for pixel shader
 	rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
-	rootParams[2].DescriptorTable.pDescriptorRanges = &srvRange;
+	rootParams[2].DescriptorTable.pDescriptorRanges = &cbvRangePSFrame;
+	rootParams[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParams[3].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[3].DescriptorTable.pDescriptorRanges = &cbvRangePSMat;
+	// SRV table param
+	rootParams[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParams[4].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[4].DescriptorTable.pDescriptorRanges = &srvRange;
 
 	// Create a single static sampler (available to all pixel shaders at the same slot)
 	D3D12_TEXTURE_ADDRESS_MODE u = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -1192,20 +1219,26 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 
 	// Verify required members (pipeline for now)
 	if (d.is_discarded() ||
-		!d.contains("pipeline") )
+		!d.contains("pipeline") ||
+		!d.contains("rootSig"))
 	{
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = GetPiplineState(L"PipelineStates/BasicPipelineState");
-		std::shared_ptr<Material> matInvalid = std::make_shared<Material>(pipelineState); // TODO: Default shaders?
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig = GetRootSig(L"RootSigs/BasicRootSig");
+		std::shared_ptr<Material> matInvalid = std::make_shared<Material>(pipelineState, rootSig);
 		AddMaterial(filename, matInvalid);
 		return matInvalid;
 	}
 
-	// Check to see if the requested pipeline state
+	// Check to see the requested pipeline state
 	std::wstring psName = NarrowToWide(d["pipeline"].get<std::string>());
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = GetPiplineState(psName);
 
+	// Check to see the requested pipeline state
+	std::wstring rsName = NarrowToWide(d["rootSig"].get<std::string>());
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig = GetRootSig(rsName);
+
 	// We have enough to make the material
-	std::shared_ptr<Material> mat = std::make_shared<Material>(pipelineState);
+	std::shared_ptr<Material> mat = std::make_shared<Material>(pipelineState, rootSig);
 
 	// Check for 3-component tint
 	if (d.contains("tint") && d["tint"].size() == 4)
@@ -1235,6 +1268,26 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 		uvOffset.y = d["uvOffset"][1].get<float>();
 		mat->SetUVOffset(uvOffset);
 	}
+
+	// Check for Topology
+	
+	if (d.contains("topology") && d["topology"].is_string())
+	{
+		D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		auto input = d["topology"].get<std::string>();
+		std::transform(input.begin(), input.end(), input.begin(),
+			[](unsigned char c) { return std::toupper(c); });
+
+		if (input == "TRIANGLELIST") { topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST; }
+		else if (input == "TRIANGLESTRIP") { topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP; }
+		else if (input == "TRIANGLEFAN") { topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLEFAN; }
+		else if (input == "LINELIST") { topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST; }
+		else if (input == "LINESTRIP") { topology = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP; }
+		else if (input == "POINTLIST") { topology = D3D_PRIMITIVE_TOPOLOGY_POINTLIST; }
+
+		mat->SetTopology(topology);
+	}
+
 
 	// Check for textures
 	if (d.contains("textures"))
@@ -1437,6 +1490,8 @@ std::shared_ptr<Scene> Assets::LoadScene(std::wstring path)
 		}
 
 	}
+
+	scene->InitialSort();
 
 	return scene;
 }

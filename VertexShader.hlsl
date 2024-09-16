@@ -1,17 +1,18 @@
 #include "ShaderIncludes.hlsli"
 
-/// <summary>
-/// Layout of our constant buffer
-/// </summary>
-cbuffer DataFromCPU : register(b0)
+
+cbuffer PerFrame : register(b0)
 {
-    matrix world;
-    matrix worldInvTranspose;
     matrix view;
     matrix proj;
 
     //matrix shadowView;
     //matrix shadowProjection;
+}
+cbuffer perObject : register(b1)
+{
+    matrix world;
+    matrix worldInvTranspose;
 }
 
 VertexToPixel main( VertexShaderInput input )

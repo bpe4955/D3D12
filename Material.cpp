@@ -4,11 +4,15 @@
 using namespace DirectX;
 
 Material::Material(
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState, 
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState,
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> _rootsignature,
+	D3D_PRIMITIVE_TOPOLOGY _topology,
 	DirectX::XMFLOAT4 _colorTint,
 	DirectX::XMFLOAT2 _uvOffset,
 	DirectX::XMFLOAT2 _uvScale):
 	pipelineState(_pipelineState),
+	rootSig(_rootsignature),
+	topology(_topology),
 	colorTint(_colorTint),
 	uvOffset(_uvOffset),
 	uvScale(_uvScale),
@@ -21,7 +25,9 @@ Material::Material(
 }
 
 // Getters
-Microsoft::WRL::ComPtr<ID3D12PipelineState> Material::GetPipelineState() { return pipelineState; } 
+Microsoft::WRL::ComPtr<ID3D12PipelineState> Material::GetPipelineState() { return pipelineState; }
+Microsoft::WRL::ComPtr<ID3D12RootSignature> Material::GetRootSignature() { return rootSig; }
+D3D_PRIMITIVE_TOPOLOGY Material::GetTopology() { return topology; }
 DirectX::XMFLOAT4 Material::GetColorTint() { return colorTint; } 
 DirectX::XMFLOAT2 Material::GetUVOffset() { return uvOffset; }
 DirectX::XMFLOAT2 Material::GetUVScale() { return uvScale; }
@@ -29,6 +35,8 @@ D3D12_GPU_DESCRIPTOR_HANDLE Material::GetFinalGPUHandleForTextures() { return fi
 
 // Setters
 void Material::SetPipelineState(Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState) { pipelineState = _pipelineState; }
+void Material::SetRootSig(Microsoft::WRL::ComPtr<ID3D12RootSignature> _rootSig) { rootSig = _rootSig; }
+void Material::SetTopology(D3D_PRIMITIVE_TOPOLOGY _topology) { topology = _topology; }
 void Material::SetColorTint(DirectX::XMFLOAT4 _colorTint) { colorTint = _colorTint; }
 void Material::SetUVOffset(DirectX::XMFLOAT2 _uvOffset) { uvOffset = _uvOffset; }
 void Material::AddUVOffset(DirectX::XMFLOAT2 _uvOffset) { uvOffset = XMFLOAT2(uvOffset.x + _uvOffset.x, uvOffset.y + _uvOffset.y); }

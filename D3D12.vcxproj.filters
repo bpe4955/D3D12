@@ -124,6 +124,9 @@
     <FxCompile Include="SkyPS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="PixelShaderBasic.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -131,6 +134,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Lighting.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="LightingBasic.hlsli">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

@@ -17,7 +17,8 @@ Material::Material(
 	uvOffset(_uvOffset),
 	uvScale(_uvScale),
 	materialTexturesFinalized(false),
-	highestSRVSlot(-1)
+	highestSRVSlot(-1),
+	roughness(-1)
 {
 	// Init remaining data
 	finalGPUHandleForSRVs = {};
@@ -32,6 +33,7 @@ DirectX::XMFLOAT4 Material::GetColorTint() { return colorTint; }
 DirectX::XMFLOAT2 Material::GetUVOffset() { return uvOffset; }
 DirectX::XMFLOAT2 Material::GetUVScale() { return uvScale; }
 D3D12_GPU_DESCRIPTOR_HANDLE Material::GetFinalGPUHandleForTextures() { return finalGPUHandleForSRVs; }
+float& Material::GetRoughness() { return roughness; }
 
 // Setters
 void Material::SetPipelineState(Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState) { pipelineState = _pipelineState; }
@@ -41,6 +43,7 @@ void Material::SetColorTint(DirectX::XMFLOAT4 _colorTint) { colorTint = _colorTi
 void Material::SetUVOffset(DirectX::XMFLOAT2 _uvOffset) { uvOffset = _uvOffset; }
 void Material::AddUVOffset(DirectX::XMFLOAT2 _uvOffset) { uvOffset = XMFLOAT2(uvOffset.x + _uvOffset.x, uvOffset.y + _uvOffset.y); }
 void Material::SetUVScale(DirectX::XMFLOAT2 _uvScale) { uvScale = _uvScale; }
+void Material::SetRoughness(float _roughness) { roughness = _roughness; }
 
 // Functions
 

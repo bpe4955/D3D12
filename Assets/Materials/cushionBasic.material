@@ -1,0 +1,19 @@
+{
+    "pipeline" : "PipelineStates/SimpleLighting",
+    "rootSig" : "RootSigs/BasicRootSig",
+    "tint": [1.0, 1.0, 1.0, 1.0],
+    "uvScale": [1.5, 1.5],
+    "uvOffset": [0.0, 0.0],
+    "roughness": 0.9,
+    "textures" : 
+    [
+        {
+            "name" : "Textures/Basic/cushion",
+            "type" : "ALBEDO"
+        },
+        {
+            "name" : "Textures/Basic/cushion_normals",
+            "type" : "NORMAL"
+        }
+    ]
+}

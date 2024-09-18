@@ -119,7 +119,7 @@ void Game::Update(float deltaTime, float totalTime)
 				XMFLOAT3(pos.x, (float)sin(i + totalTime), pos.z));
 		}
 		entities.back()->GetTransform()->SetPosition(XMFLOAT3((float)sin(totalTime), 1, (float)cos(totalTime)));
-
+		entities.back()->GetTransform()->Rotate(XMFLOAT3(0, (float)sin(totalTime) / 58, 0));
 		// Camera
 		std::shared_ptr<Camera> currentCamera = scene->GetCurrentCamera();
 		currentCamera->Update(deltaTime);

@@ -1,0 +1,19 @@
+{
+    "pipeline" : "PipelineStates/SimpleLighting",
+    "rootSig" : "RootSigs/BasicRootSig",
+    "tint": [1.0, 1.0, 1.0, 1.0],
+    "uvScale": [1.0, 1.0],
+    "uvOffset": [0.0, 0.0],
+    "roughness": 0.9,
+    "textures" : 
+    [
+        {
+            "name" : "Textures/Basic/cobblestone",
+            "type" : "ALBEDO"
+        },
+        {
+            "name" : "Textures/Basic/cobblestone_normals",
+            "type" : "NORMAL"
+        }
+    ]
+}

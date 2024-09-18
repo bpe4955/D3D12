@@ -46,6 +46,7 @@ struct PSPerFrameData
 	DirectX::XMFLOAT3 cameraPosition;
 	int lightCount;
 	Light lights[MAX_LIGHTS];
+	DirectX::XMFLOAT4 ambient;
 };
 
 struct PSPerMaterialData

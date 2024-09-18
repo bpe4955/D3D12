@@ -21,6 +21,7 @@ public:
 	DirectX::XMFLOAT2 GetUVOffset();
 	DirectX::XMFLOAT2 GetUVScale();
 	D3D12_GPU_DESCRIPTOR_HANDLE GetFinalGPUHandleForTextures();
+	float& GetRoughness();
 
 	// Setters
 	void SetPipelineState(Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState);
@@ -30,6 +31,7 @@ public:
 	void SetUVOffset(DirectX::XMFLOAT2 _uvOffset);
 	void AddUVOffset(DirectX::XMFLOAT2 _uvOffset);
 	void SetUVScale(DirectX::XMFLOAT2  _uvScale);
+	void SetRoughness(float _roughness);
 
 	// Functions
 	void AddTexture(D3D12_CPU_DESCRIPTOR_HANDLE srv, int slot);
@@ -51,5 +53,6 @@ private:
 	DirectX::XMFLOAT4 colorTint;
 	DirectX::XMFLOAT2 uvOffset;
 	DirectX::XMFLOAT2 uvScale;
+	float roughness;
 };
 

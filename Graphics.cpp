@@ -620,6 +620,7 @@ void Graphics::RenderSimple(std::shared_ptr<Scene> scene,
 
 			PSPerMaterialData psMatData = {};
 			psMatData.colorTint = mat->GetColorTint();
+			if (mat->GetRoughness() != -1) psMatData.colorTint.w = mat->GetRoughness(); // Store roughness in the alpha of colorTint
 			psMatData.uvScale = mat->GetUVScale();
 			psMatData.uvOffset = mat->GetUVOffset();
 			D3D12_GPU_DESCRIPTOR_HANDLE psPerMatHandle = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
@@ -723,9 +724,13 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 	PSPerFrameData psPerFrameData = {};
 	psPerFrameData.cameraPosition = scene->GetCurrentCamera()->GetTransform()->GetPosition();
 	psPerFrameData.lightCount = (int)scene->GetLights().size();
+	DirectX::XMFLOAT3 ambientColor = scene->GetSky()->GetLights()[0].Color;
+	const float ambMult = 0.05f;
+	psPerFrameData.ambient = DirectX::XMFLOAT4(ambientColor.x * ambMult, ambientColor.y * ambMult, ambientColor.z * ambMult, 1);
 	memcpy(psPerFrameData.lights, &scene->GetLights()[0], sizeof(Light) * MAX_LIGHTS);
 	D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
 		(void*)(&psPerFrameData), sizeof(PSPerFrameData));
+	
 
 	// Get the sorted renderable list
 	if (!scene->OpaqueReady()) { scene->InitialSort(); }
@@ -758,10 +763,12 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 			// Set Pixel Shader Data
 			PSPerMaterialData psData = {};
 			psData.colorTint = currentMaterial->GetColorTint();
+			if (currentMaterial->GetRoughness() != -1) psData.colorTint.w = currentMaterial->GetRoughness(); // Store roughness in the alpha of colorTint
 			psData.uvScale = currentMaterial->GetUVScale();
 			psData.uvOffset = currentMaterial->GetUVOffset();
 			D3D12_GPU_DESCRIPTOR_HANDLE cbHandlePS = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
 				(void*)(&psData), sizeof(PSPerMaterialData));
+
 			commandList->SetGraphicsRootDescriptorTable(3, cbHandlePS);
 
 			// Set the SRV descriptor handle for this material's textures

@@ -1269,8 +1269,13 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 		mat->SetUVOffset(uvOffset);
 	}
 
+	// Roughness
+	if (d.contains("roughness"))
+	{
+		mat->SetRoughness(d["roughness"].get<float>());
+	}
+
 	// Check for Topology
-	
 	if (d.contains("topology") && d["topology"].is_string())
 	{
 		D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1306,7 +1311,7 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 			{ mat->AddTexture(texture, 0); }
 			else if (textureType == "NORMALS" || textureType == "NORMAL")
 			{ mat->AddTexture(texture, 1); }
-			else if (textureType == "ROUGHNESS" || textureType == "ROUGH")
+			else if (textureType == "ROUGHNESS" || textureType == "ROUGH" || textureType == "SPECULAR")
 			{ mat->AddTexture(texture, 2); }
 			else if (textureType == "METAL" || textureType == "METALNESS")
 			{ mat->AddTexture(texture, 3); }

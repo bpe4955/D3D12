@@ -30,6 +30,7 @@ cbuffer PerFrame : register(b0)
     float3 cameraPosition;
     int lightCount;
     Light lights[MAX_LIGHTS];
+    float4 ambient;
 }
 
 cbuffer PerMaterial : register(b1)

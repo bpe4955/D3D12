@@ -75,7 +75,7 @@ private:
 	// Maximum number of constant buffers, assuming each buffer
 	// is 256 bytes or less. Larger buffers are fine, but will
 	// result in fewer buffers in use at any time
-	const unsigned int maxConstantBuffers = 1000;
+	const unsigned int maxConstantBuffers = 10000;
 	// GPU-side constant buffer upload heap
 	Microsoft::WRL::ComPtr<ID3D12Resource> cbUploadHeap;
 	UINT64 cbUploadHeapSizeInBytes = 0;

@@ -247,7 +247,9 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
     /// Texturing
     ///
     uv = uv * uvScale + uvOffset; // Scale and offset UVs
-    float3 surfaceColor = pow(AlbedoTexture.Sample(Sampler, uv).rgb, 2.2f); // Surface color with gamma correction
+    float4 textureColor = AlbedoTexture.Sample(Sampler, uv);
+    clip(textureColor.a * colorTint.a - 0.1); // Simple Alpha Culling
+    float3 surfaceColor = pow(textureColor.rgb, 2.2f); // Surface color with gamma correction
     //surfaceColor = hasMask ? (surfaceColor * TextureMask.Sample(Sampler, uv).rgb) : surfaceColor; // Adjust surface color with mask
     
     //normal = hasNormalMap ? normalMapCalc(uv, normal, tangent) : normal;

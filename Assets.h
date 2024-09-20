@@ -126,6 +126,11 @@ private:
 	std::shared_ptr<Camera> ParseCamera(nlohmann::json jsonCamera);
 	Light ParseLight(nlohmann::json jsonLight);
 	std::shared_ptr<Entity> ParseEntity(nlohmann::json jsonEntity);
+	void ParseComplexMesh(std::wstring path,
+		std::vector<std::shared_ptr<Mesh>>& meshes,
+		std::vector<std::shared_ptr<Material>>& materials,
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState,
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> rootsignature);
 
 	/// Helpers for determining the actual path to the executable
 	/// Written By vixorien https://github.dev/vixorien/ggp-advanced-demos

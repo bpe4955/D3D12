@@ -56,7 +56,7 @@ void Game::LoadAssets()
 		Graphics::Device, true);
 
 	// Load a scene json file
-	scene = Assets::GetInstance().LoadScene(L"Scenes/basicScene");
+	scene = Assets::GetInstance().LoadScene(L"Scenes/peachesCastle");
 	currentCameraIndex = 0;
 	scene->GetCurrentCamera()->UpdateProjectionMatrix(Window::AspectRatio());
 }
@@ -107,6 +107,10 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::KeyDown(VK_ESCAPE))
 		Window::Quit();
 
+	// Camera
+	std::shared_ptr<Camera> currentCamera = scene->GetCurrentCamera();
+	currentCamera->Update(deltaTime);
+
 	if(scene->GetName() == "basicScene")
 	{
 		// Entities
@@ -120,16 +124,21 @@ void Game::Update(float deltaTime, float totalTime)
 		}
 		entities.back()->GetTransform()->SetPosition(XMFLOAT3((float)sin(totalTime), 1, (float)cos(totalTime)));
 		entities.back()->GetTransform()->Rotate(XMFLOAT3(0, (float)sin(totalTime) / 58, 0));
-		// Camera
-		std::shared_ptr<Camera> currentCamera = scene->GetCurrentCamera();
-		currentCamera->Update(deltaTime);
-		//XMFLOAT3 camPos = currentCamera->GetTransform()->GetPosition();
-		//printf("Camera Position: %f, %f, %f \n", camPos.x, camPos.y, camPos.z);
-
-		// Lights
-		scene->GetLights()[0].Position = currentCamera->GetTransform()->GetPosition();
-		scene->GetLights()[0].Direction = MouseDirection();
 	}
+
+	if (Input::KeyPress(VK_TAB))
+	{
+		XMFLOAT3 camPos = currentCamera->GetTransform()->GetPosition();
+		printf("Camera Position: %f, %f, %f \n", camPos.x, camPos.y, camPos.z);
+		XMFLOAT3 camRot = currentCamera->GetTransform()->GetPitchYawRoll();
+		printf("Camera Rotation: %f, %f, %f \n", camRot.x, camRot.y, camRot.z);
+		XMFLOAT3 camFrd = currentCamera->GetTransform()->GetForward();
+		printf("Camera Forward: %f, %f, %f \n", camFrd.x, camFrd.y, camFrd.z);
+	}
+
+	// Lights
+	scene->GetLights()[0].Position = currentCamera->GetTransform()->GetPosition();
+	scene->GetLights()[0].Direction = MouseDirection();
 }
 
 

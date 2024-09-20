@@ -15,6 +15,12 @@
 #include "Graphics.h"
 using json = nlohmann::json;
 
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include "assimp/material.h"
+#include <iostream>
+
 // Singleton requirement
 Assets* Assets::instance;
 
@@ -148,7 +154,7 @@ std::shared_ptr<Mesh> Assets::GetMesh(std::wstring name)
 	// Attempt to load on-demand?
 	if (allowOnDemandLoading)
 	{
-		// Is it a JPG?
+		// Is it a OBJ?
 		std::wstring filePathOBJ = FixPath(rootAssetPath + name + L".obj");
 		if (std::filesystem::exists(filePathOBJ))
 		{
@@ -157,7 +163,7 @@ std::shared_ptr<Mesh> Assets::GetMesh(std::wstring name)
 		// Is it a FBX?
 		std::wstring filePathFBX = FixPath(rootAssetPath + name + L".fbx");
 		if (std::filesystem::exists(filePathFBX)) { return LoadMesh(filePathFBX); }
-		// Is it a FBX?
+		// Is it a DAE?
 		std::wstring filePathDAE = FixPath(rootAssetPath + name + L".dae");
 		if (std::filesystem::exists(filePathDAE)) { return LoadMesh(filePathDAE); }
 	}
@@ -1586,11 +1592,41 @@ Light Assets::ParseLight(nlohmann::json jsonLight)
 
 std::shared_ptr<Entity> Assets::ParseEntity(nlohmann::json jsonEntity)
 {
-	Assets& assets = Assets::GetInstance();
+	std::shared_ptr<Entity> entity;
 
-	std::shared_ptr<Entity> entity = std::make_shared<Entity>(
-		assets.GetMesh(NarrowToWide(jsonEntity["mesh"].get<std::string>())),
-		assets.GetMaterial(NarrowToWide(jsonEntity["material"].get<std::string>())));
+	std::vector<std::shared_ptr<Mesh>> meshes;
+	std::vector<std::shared_ptr<Material>> materials;
+
+	if (jsonEntity.contains("material"))
+	{
+		materials.push_back(GetMaterial(NarrowToWide(jsonEntity["material"].get<std::string>())));
+	}
+
+	if (jsonEntity.contains("mesh"))
+	{
+		meshes.push_back(GetMesh(NarrowToWide(jsonEntity["mesh"].get<std::string>())));
+	}
+	else {
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState
+			= GetPiplineState(NarrowToWide(jsonEntity["pipeline"].get<std::string>()));
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> rootsignature
+			= GetRootSig(NarrowToWide(jsonEntity["rootSig"].get<std::string>()));
+
+		std::wstring name = NarrowToWide(jsonEntity["model"].get<std::string>());
+		std::wstring filePathOBJ = FixPath(rootAssetPath + name + L".obj");
+		std::wstring filePathFBX = FixPath(rootAssetPath + name + L".fbx");
+		std::wstring filePathDAE = FixPath(rootAssetPath + name + L".dae");
+		// Is it a OBJ?
+		if (std::filesystem::exists(filePathOBJ)) 
+		{ ParseComplexMesh(filePathOBJ, meshes, materials, pipelineState, rootsignature); }
+		// Is it a FBX?
+		else if (std::filesystem::exists(filePathFBX)) 
+		{ ParseComplexMesh(filePathFBX, meshes, materials, pipelineState, rootsignature); }
+		// Is it a DAE?
+		else if (std::filesystem::exists(filePathDAE)) 
+		{ ParseComplexMesh(filePathDAE, meshes, materials, pipelineState, rootsignature); }
+	}
+	entity = std::make_shared<Entity>(meshes, materials);
 
 	// Early out if transform is missing
 	if (!jsonEntity.contains("transform")) return entity;
@@ -1626,6 +1662,149 @@ std::shared_ptr<Entity> Assets::ParseEntity(nlohmann::json jsonEntity)
 	entity->GetTransform()->SetRotation(rot);
 	entity->GetTransform()->SetScale(sc);
 	return entity;
+}
+// Using Assimp to import meshes and materials
+void Assets::ParseComplexMesh(std::wstring path, 
+	std::vector<std::shared_ptr<Mesh>>& meshes, 
+	std::vector<std::shared_ptr<Material>>& materials,
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState,
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootsignature)
+{
+	// Strip out everything before and including the asset root path
+	size_t assetPathLength = rootAssetPath.size();
+	size_t assetPathPosition = path.rfind(rootAssetPath);
+	std::wstring filenameWide = path.substr(assetPathPosition + assetPathLength);
+
+	if (printLoadingProgress)
+	{
+
+		printf("Loading complex mesh: ");
+		wprintf(filenameWide.c_str());
+		printf("\n");
+	}
+
+	std::wstring pathFolder = filenameWide.substr(0, filenameWide.find_last_of(L"/")+1);
+
+	std::string fileName = WideToNarrow(path);
+	const aiScene* scene = aiImportFile(fileName.c_str(), aiProcessPreset_TargetRealtime_MaxQuality |
+		aiProcess_ConvertToLeftHanded);
+
+	if (!scene) {
+		std::cerr << "Could not load file " << fileName << ": " << aiGetErrorString() << std::endl;
+		return;
+	}
+
+	// Load each mesh in its own mesh with its own material
+	for (size_t meshIndex = 0; meshIndex < scene->mNumMeshes; meshIndex++)
+	{
+		std::vector<Vertex> vertices;
+		std::vector<unsigned int> indices;
+		aiMesh* readMesh = scene->mMeshes[meshIndex];
+
+		// Material Data
+		{
+			std::shared_ptr<Material> mat = std::make_shared<Material>(pipelineState, rootsignature);
+
+			aiMaterial* material = scene->mMaterials[readMesh->mMaterialIndex];
+			aiColor4D specularColor;
+			aiColor4D diffuseColor;
+			aiColor4D ambientColor;
+			float shininess;
+			float opacity;
+
+			aiGetMaterialColor(material, AI_MATKEY_COLOR_SPECULAR, &specularColor);
+			aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &diffuseColor);
+			aiGetMaterialColor(material, AI_MATKEY_COLOR_AMBIENT, &ambientColor);
+			aiGetMaterialFloat(material, AI_MATKEY_SHININESS, &shininess);
+			aiGetMaterialFloat(material, AI_MATKEY_OPACITY, &opacity);
+			mat->SetRoughness(1 - shininess);
+			mat->SetColorTint(DirectX::XMFLOAT4(diffuseColor.r, diffuseColor.g, diffuseColor.b, diffuseColor.a));
+
+			// Diffuse Texture
+			aiString diffuseName;
+			aiGetMaterialTexture(material, aiTextureType_DIFFUSE, 0, &diffuseName);
+			if (diffuseName.length != 0)
+			{
+				std::wstring diffusePath = pathFolder + NarrowToWide(diffuseName.C_Str());
+				D3D12_CPU_DESCRIPTOR_HANDLE diffuseTexture = GetTexture(RemoveFileExtension(diffusePath));
+				mat->AddTexture(diffuseTexture, 0);
+			} else mat->AddTexture(GetTexture(L"Textures/white"), 0);
+			// Normal Map Texture
+			aiString normalName;
+			aiGetMaterialTexture(material, aiTextureType_NORMALS, 0, &normalName);
+			if (normalName.length != 0)
+			{
+				std::wstring normalPath = pathFolder + NarrowToWide(normalName.C_Str());
+				D3D12_CPU_DESCRIPTOR_HANDLE normalTexture = GetTexture(RemoveFileExtension(normalPath));
+				mat->AddTexture(normalTexture, 1);
+			} else mat->AddTexture(GetTexture(L"Textures/black"), 1);
+			// Specular Map Texture
+			aiString specName;
+			aiGetMaterialTexture(material, aiTextureType_SPECULAR, 0, &specName);
+			if (specName.length != 0)
+			{
+				std::wstring specPath = pathFolder + NarrowToWide(specName.C_Str());
+				D3D12_CPU_DESCRIPTOR_HANDLE specTexture = GetTexture(RemoveFileExtension(specPath));
+				mat->AddTexture(specTexture, 2);
+			} else mat->AddTexture(GetTexture(L"Textures/black"), 2);
+
+			mat->AddTexture(GetTexture(L"Textures/black"), 3);
+
+			mat->FinalizeMaterial();
+			materials.push_back(mat);
+		}
+		// Vertex Data
+		if (readMesh->HasPositions() && readMesh->HasNormals())
+		{
+			for (size_t i = 0; i < readMesh->mNumVertices; i++)
+			{
+				Vertex v;
+
+				aiVector3D pos = readMesh->mVertices[i];
+				v.Position.x = pos.x;
+				v.Position.y = pos.y;
+				v.Position.z = pos.z;
+
+				aiVector3D norm = readMesh->mNormals[i];
+				v.Normal.x = norm.x;
+				v.Normal.y = norm.y;
+				v.Normal.z = norm.z;
+
+				if (readMesh->HasTextureCoords(0)) {
+					aiVector3D uv = readMesh->mTextureCoords[0][i];
+					v.UV.x = uv.x;
+					v.UV.y = uv.y;
+				}
+
+				if (readMesh->HasTangentsAndBitangents()) {
+					aiVector3D tan = readMesh->mTangents[i];
+					v.Tangent.x = tan.x;
+					v.Tangent.y = tan.y;
+					v.Tangent.z = tan.z;
+				}
+
+				vertices.push_back(v);
+			}
+		}
+
+		// Indices
+		//std::vector<unsigned int> indices;
+		//indices.reserve(readMesh->mNumFaces * 3);
+		for (size_t i = 0; i < readMesh->mNumFaces; i++)
+		{
+			//assert(readMesh->mFaces[i].mNumIndices == 3);
+			for (size_t f = 0; f < readMesh->mFaces[i].mNumIndices; f++)
+			{
+				indices.push_back(readMesh->mFaces[i].mIndices[f]);
+			}
+		}
+
+		// Add the mesh
+		meshes.push_back(std::make_shared<Mesh>(
+			&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size()));
+	}
+
+	aiReleaseImport(scene);
 }
 
 

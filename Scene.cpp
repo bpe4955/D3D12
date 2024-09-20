@@ -57,7 +57,7 @@ void Scene::InitialSort()
 	std::sort(opaqueEntities.begin(), opaqueEntities.end(), [](const auto& e1, const auto& e2)
 		{
 			// Compare pointers to materials
-			return e1->GetMaterial() < e2->GetMaterial();
+			return e1->GetMaterials()[0]->GetPipelineState() < e2->GetMaterials()[0]->GetPipelineState();
 		});
 	opaqueEntitiesOrganized = true;
 }

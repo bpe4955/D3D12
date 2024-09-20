@@ -7,21 +7,24 @@
 class Entity
 {
 public:
-	Entity(std::shared_ptr<Mesh> _mesh, std::shared_ptr<Material> _material);
+	Entity(std::shared_ptr<Mesh> _mesh,
+		std::shared_ptr<Material> _material);
+	Entity(std::vector<std::shared_ptr<Mesh>> _meshes,
+		std::vector<std::shared_ptr<Material>> _materials);
 
 	// Getters
 	std::shared_ptr<Transform> GetTransform();
-	std::shared_ptr<Mesh> GetMesh();
-	std::shared_ptr<Material> GetMaterial();
+	std::vector<std::shared_ptr<Mesh>> GetMeshes();
+	std::vector<std::shared_ptr<Material>> GetMaterials();
 
 	// Setters
 	void setTransform(std::shared_ptr<Transform> _transform);
-	void SetMesh(std::shared_ptr<Mesh> _mesh);
-	void SetMaterial(std::shared_ptr<Material> _material);
+	void SetMeshes(std::vector<std::shared_ptr<Mesh>> _mesh);
+	void SetMaterials(std::vector<std::shared_ptr<Material>> _material);
 
 private:
 	std::shared_ptr<Transform> transform;
-	std::shared_ptr<Mesh> mesh;
-	std::shared_ptr<Material> material;
+	std::vector<std::shared_ptr<Mesh>> meshes;
+	std::vector<std::shared_ptr<Material>> materials;
 };
 

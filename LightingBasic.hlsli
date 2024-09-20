@@ -161,7 +161,10 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
     // (Includes checks if textures exist, which would make each pass take the same time regardless of SRVs)
     uv += uvOffset;
     uv *= uvScale;
-    float3 surfaceColor = pow(SurfaceTexture.Sample(Sampler, uv).rgb, 2.2f) * colorTint.rbg;
+    // Alpha Clipping
+    float4 textureColor = SurfaceTexture.Sample(Sampler, uv);
+    clip(textureColor.a - 0.1);
+    float3 surfaceColor = pow(textureColor.rgb, 2.2f) * colorTint.rbg;
     float specScale = SpecularMap.Sample(Sampler, uv).r;
     if (specScale == 0)
         specScale = 1.0f;

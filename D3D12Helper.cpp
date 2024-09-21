@@ -43,6 +43,7 @@ void D3D12Helper::Initialize(
 	// Create heaps for buffer wrangling
 	CreateConstantBufferUploadHeap();
 	CreateCBVSRVDescriptorHeap();
+	CreateImGuiHeap();
 }
 // --------------------------------------------------------
 // Closes the current command list and tells the GPU to
@@ -321,6 +322,15 @@ void D3D12Helper::CreateCBVSRVDescriptorHeap()
 	srvDescriptorOffset = maxConstantBuffers;
 }
 
+void D3D12Helper::CreateImGuiHeap()
+{
+	D3D12_DESCRIPTOR_HEAP_DESC DescriptorImGuiRender = {};
+	DescriptorImGuiRender.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	DescriptorImGuiRender.NumDescriptors = 3;
+	DescriptorImGuiRender.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	device->CreateDescriptorHeap(&DescriptorImGuiRender, IID_PPV_ARGS(imGuiHeap.GetAddressOf()));
+}
+
 
 // --------------------------------------------------------
 // Helper for creating a static buffer that will get
@@ -427,6 +437,11 @@ Microsoft::WRL::ComPtr<ID3D12Resource> D3D12Helper::CreateStaticBuffer(
 Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> D3D12Helper::GetCBVSRVDescriptorHeap()
 {
 	return cbvSrvDescriptorHeap;
+}
+
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> D3D12Helper::GetImGuiHeap()
+{
+	return imGuiHeap;
 }
 
 // --------------------------------------------------------

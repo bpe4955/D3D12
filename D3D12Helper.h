@@ -42,6 +42,7 @@ public:
 		void* data);
 	// Constant Buffer heap
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetCBVSRVDescriptorHeap();
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetImGuiHeap();
 	D3D12_GPU_DESCRIPTOR_HANDLE FillNextConstantBufferAndGetGPUDescriptorHandle(
 		void* data,
 		unsigned int dataSizeInBytes);
@@ -82,11 +83,13 @@ private:
 	UINT64 cbUploadHeapOffsetInBytes = 0;
 	void* cbUploadHeapStartAddress = 0;
 	// GPU-side CBV/SRV descriptor heap
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> imGuiHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvSrvDescriptorHeap;
 	SIZE_T cbvSrvDescriptorHeapIncrementSize = 0;
 	unsigned int cbvDescriptorOffset = 0;
 	void CreateConstantBufferUploadHeap();
 	void CreateCBVSRVDescriptorHeap();
+	void CreateImGuiHeap();
 	// Frame sync'ing
 	Microsoft::WRL::ComPtr<ID3D12Fence> frameSyncFence = {};
 	HANDLE								frameSyncFenceEvent = {};

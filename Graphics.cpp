@@ -2,6 +2,11 @@
 #include "D3D12Helper.h"
 #include "Assets.h"
 
+#include "include/ImGui/imgui.h"
+#include "include/ImGui/imgui_impl_win32.h"
+#include "include/ImGui/imgui_impl_dx12.h"
+#include "include/ImGui/imgui_internal.h"
+
 // Tell the drivers to use high-performance GPU in multi-GPU systems (like laptops)
 extern "C"
 {
@@ -699,6 +704,15 @@ void Graphics::RenderSimple(std::shared_ptr<Scene> scene,
 		Graphics::commandList->DrawIndexedInstanced(scene->GetSky()->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
 	}
 
+	// ImGui
+	{
+		ImGui::Render();
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> imGuiHeap = d3d12Helper.GetImGuiHeap();
+		commandList->SetDescriptorHeaps(1, imGuiHeap.GetAddressOf());
+		ImDrawData* drawData = ImGui::GetDrawData();
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), Graphics::commandList.Get());
+	}
+
 	FrameEnd();
 }
 
@@ -856,6 +870,15 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 
 		// Call DrawIndexedInstanced() using the index count of this entity’s mesh
 		Graphics::commandList->DrawIndexedInstanced(scene->GetSky()->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
+	}
+
+	// ImGui
+	{
+		ImGui::Render();
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> imGuiHeap = d3d12Helper.GetImGuiHeap();
+		commandList->SetDescriptorHeaps(1, imGuiHeap.GetAddressOf());
+		ImDrawData* drawData = ImGui::GetDrawData();
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), Graphics::commandList.Get());
 	}
 
 	// Perform Frame End operations

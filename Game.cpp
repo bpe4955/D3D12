@@ -10,6 +10,11 @@
 
 #include <DirectXMath.h>
 
+#include "include/ImGui/imgui.h"
+#include "include/ImGui/imgui_impl_win32.h"
+#include "include/ImGui/imgui_impl_dx12.h"
+#include "include/ImGui/imgui_internal.h"
+
 // Needed for a helper function to load pre-compiled shader files
 #pragma comment(lib, "d3dcompiler.lib")
 #include <d3dcompiler.h>
@@ -26,6 +31,20 @@ using namespace DirectX;
 // --------------------------------------------------------
 void Game::Initialize()
 {
+	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
+	// Initialize ImGui itself & platform/renderer backends
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(Window::Handle());
+	ID3D12DescriptorHeap* cbvHeap = d3d12Helper.GetImGuiHeap().Get();
+	ImGui_ImplDX12_Init(Graphics::Device.Get(), Graphics::numBackBuffers,
+		DXGI_FORMAT_R8G8B8A8_UNORM, cbvHeap,
+		cbvHeap->GetCPUDescriptorHandleForHeapStart(),
+		cbvHeap->GetGPUDescriptorHandleForHeapStart());
+
+	// Game Init
 	LoadAssets();
 	CreateLights();
 
@@ -44,7 +63,13 @@ Game::~Game()
 {
 	D3D12Helper::GetInstance().WaitForGPU();
 
+	// Assets
 	delete& Assets::GetInstance();
+
+	// ImGui
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 }
 
 void Game::LoadAssets()
@@ -107,6 +132,9 @@ void Game::Update(float deltaTime, float totalTime)
 	if (Input::KeyDown(VK_ESCAPE))
 		Window::Quit();
 
+	// ImGui
+	ImGuiUpdate(deltaTime);
+
 	// Camera
 	std::shared_ptr<Camera> currentCamera = scene->GetCurrentCamera();
 	currentCamera->Update(deltaTime);
@@ -139,6 +167,7 @@ void Game::Update(float deltaTime, float totalTime)
 	// Lights
 	scene->GetLights()[0].Position = currentCamera->GetTransform()->GetPosition();
 	scene->GetLights()[0].Direction = MouseDirection();
+
 }
 
 
@@ -148,6 +177,40 @@ void Game::Update(float deltaTime, float totalTime)
 void Game::Draw(float deltaTime, float totalTime)
 {
 	Graphics::RenderOptimized(scene, (UINT)scene->GetLights().size());
+}
+
+void Game::ImGuiUpdate(float deltaTime)
+{
+	// Feed fresh data to ImGui
+	ImGuiIO& io = ImGui::GetIO();
+	io.DeltaTime = deltaTime;
+	io.DisplaySize.x = (float)Window::Width();
+	io.DisplaySize.y = (float)Window::Height();
+	// Reset the frame
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+	// Determine new input capture
+	Input::SetKeyboardCapture(io.WantCaptureKeyboard);
+	Input::SetMouseCapture(io.WantCaptureMouse);
+	// Show the demo window
+	if (showDemoWindow)
+	{
+		ImGui::ShowDemoWindow(&showDemoWindow);
+	}
+	
+	BuildUI();
+}
+
+void Game::BuildUI()
+{
+	//char buf[128];
+	//sprintf_s(buf, "Custom Debug %c###CustomDebug", "|/-\\"[(int)(ImGui::GetTime() / 0.25f) & 3]);
+	//ImGui::Begin(buf, NULL, ImGuiWindowFlags_AlwaysAutoResize);
+	//
+	//
+	//
+	//ImGui::End();
 }
 
 /// <summary>

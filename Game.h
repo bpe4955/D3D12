@@ -26,20 +26,19 @@ public:
 	void OnResize();
 
 private:
-	// Initialization helper methods - feel free to customize, combine, remove, etc.
-	//void LoadShaders();
+	// Initialization helper methods 
 	void LoadAssets();
 	void CreateLights();
-
-	// Note the usage of ComPtr below
-	//  - This is a smart pointer for objects that abide by the
-	//     Component Object Model, which DirectX objects do
-	//  - More info here: https://github.com/Microsoft/DirectXTK/wiki/ComPtr
 
 	std::shared_ptr<Scene> scene;
 	unsigned int currentCameraIndex;
 
+	// ImGui
+	bool showDemoWindow = true;
+
 	// Helper Functions
+	void ImGuiUpdate(float deltaTime);
+	void BuildUI();
 	DirectX::XMFLOAT3 MouseDirection();
 };
 

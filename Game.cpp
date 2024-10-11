@@ -66,6 +66,8 @@ Game::~Game()
 	// Assets
 	delete& Assets::GetInstance();
 
+	Graphics::swapChain->SetFullscreenState(false, NULL);
+
 	// ImGui
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
@@ -81,7 +83,7 @@ void Game::LoadAssets()
 		Graphics::Device, true);
 
 	// Load a scene json file
-	scene = Assets::GetInstance().LoadScene(L"Scenes/peachesCastle");
+	scene = Assets::GetInstance().LoadScene(L"Scenes/basicScene");
 	currentCameraIndex = 0;
 	scene->GetCurrentCamera()->UpdateProjectionMatrix(Window::AspectRatio());
 }
@@ -179,6 +181,11 @@ void Game::Draw(float deltaTime, float totalTime)
 	Graphics::RenderOptimized(scene, (UINT)scene->GetLights().size());
 }
 
+
+// ImGui
+bool showDemoWindow = false;
+bool isFullscreen = false;
+
 void Game::ImGuiUpdate(float deltaTime)
 {
 	// Feed fresh data to ImGui
@@ -204,13 +211,52 @@ void Game::ImGuiUpdate(float deltaTime)
 
 void Game::BuildUI()
 {
-	//char buf[128];
-	//sprintf_s(buf, "Custom Debug %c###CustomDebug", "|/-\\"[(int)(ImGui::GetTime() / 0.25f) & 3]);
-	//ImGui::Begin(buf, NULL, ImGuiWindowFlags_AlwaysAutoResize);
-	//
-	//
-	//
-	//ImGui::End();
+	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
+
+	char buf[128];
+	sprintf_s(buf, "Custom Debug %c###CustomDebug", "|/-\\"[(int)(ImGui::GetTime() / 0.25f) & 3]);
+	ImGui::Begin(buf, NULL, ImGuiWindowFlags_AlwaysAutoResize);
+	
+	ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+	if (ImGui::TreeNode("App Details"))
+	{
+		float fps = ImGui::GetIO().Framerate;
+		if (fps > 58) { ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Framerate: %f fps", fps); }
+		else if (fps > 30) { ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Framerate: %f fps", fps); }
+		else { ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Framerate: %f fps", fps); }
+		ImGui::Text("Frame Count: %d", ImGui::GetFrameCount());
+		ImGui::Text("Window Resolution: %dx%d", Window::Width(), Window::Height());
+		ImGui::Checkbox("ImGui Demo Window Visibility", &showDemoWindow);
+		if (ImGui::Button(isFullscreen ? "Windowed" : "Fullscreen")) {
+			isFullscreen = !isFullscreen;
+			Graphics::swapChain->SetFullscreenState(isFullscreen, NULL);
+		}
+
+		ImGui::TreePop();
+	}
+	if (ImGui::TreeNode("Scene"))
+	{
+		const char* items[] = { "Basic", "Peaches Castle", "Click Clock Wood"};
+		static int item_current = 0;
+		if (ImGui::Combo("combo", &item_current, items, IM_ARRAYSIZE(items)))
+		{
+			Graphics::ResizeBuffers(Window::Width(), Window::Height());
+			scene->Clear();
+			switch (item_current)
+			{
+			case 0: scene = Assets::GetInstance().LoadScene(L"Scenes/basicScene"); break;
+			case 1: scene = Assets::GetInstance().LoadScene(L"Scenes/peachesCastle"); break;
+			case 2: scene = Assets::GetInstance().LoadScene(L"Scenes/clickClockWood"); break;
+			}
+			currentCameraIndex = 0;
+			scene->GetCurrentCamera()->UpdateProjectionMatrix(Window::AspectRatio());
+		}
+
+		ImGui::TreePop();
+	}
+	
+	
+	ImGui::End();
 }
 
 /// <summary>

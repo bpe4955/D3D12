@@ -33,9 +33,6 @@ private:
 	std::shared_ptr<Scene> scene;
 	unsigned int currentCameraIndex;
 
-	// ImGui
-	bool showDemoWindow = true;
-
 	// Helper Functions
 	void ImGuiUpdate(float deltaTime);
 	void BuildUI();

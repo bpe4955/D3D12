@@ -399,3 +399,6 @@ FodyWeavers.xsd
 
 #Assets
 /Assets
+
+#ImGui
+/imgui.ini

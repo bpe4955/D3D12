@@ -154,6 +154,12 @@ void Game::Update(float deltaTime, float totalTime)
 		}
 		entities.back()->GetTransform()->SetPosition(XMFLOAT3((float)sin(totalTime), 1, (float)cos(totalTime)));
 		entities.back()->GetTransform()->Rotate(XMFLOAT3(0, (float)sin(totalTime) / 58, 0));
+
+		if (scene->GetEmitters().size() == 0)
+		{
+			scene->GetEmitters().push_back(std::make_shared<Emitter>((int)100, (int)5, (float)5));
+		}
+
 	}
 
 	if (Input::KeyPress(VK_TAB))
@@ -170,6 +176,12 @@ void Game::Update(float deltaTime, float totalTime)
 	scene->GetLights()[0].Position = currentCamera->GetTransform()->GetPosition();
 	scene->GetLights()[0].Direction = MouseDirection();
 
+	// Emitters
+	for (std::shared_ptr<Emitter> emitter : scene->GetEmitters())
+	{
+		emitter->Update(deltaTime, totalTime);
+	}
+
 }
 
 
@@ -178,7 +190,8 @@ void Game::Update(float deltaTime, float totalTime)
 // --------------------------------------------------------
 void Game::Draw(float deltaTime, float totalTime)
 {
-	Graphics::RenderOptimized(scene, (UINT)scene->GetLights().size());
+	Graphics::RenderOptimized(scene, (UINT)scene->GetLights().size(),
+		deltaTime, totalTime);
 }
 
 

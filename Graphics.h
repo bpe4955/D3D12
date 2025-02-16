@@ -47,5 +47,7 @@ namespace Graphics
 
 	// --- Renderer ---
 	void RenderSimple(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
-	void RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
+	void RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount,
+		float dt = 0,
+		float currentTime = 0);
 }

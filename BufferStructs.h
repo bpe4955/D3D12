@@ -41,6 +41,14 @@ struct VSPerObjectData
 	DirectX::XMFLOAT4X4 worldInvTranspose;
 };
 
+struct VSEmitterPerFrameData
+{
+	float currentTime;
+	DirectX::XMFLOAT3 acceleration;
+
+	float lifeTime;
+};
+
 struct PSPerFrameData
 {
 	DirectX::XMFLOAT3 cameraPosition;

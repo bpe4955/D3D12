@@ -434,6 +434,80 @@ Microsoft::WRL::ComPtr<ID3D12Resource> D3D12Helper::CreateStaticBuffer(
 	return buffer;
 }
 
+// Used the following page to help format a Structured Buffer
+// https://www.stefanpijnacker.nl/article/directx12-resources-key-concepts/
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12Helper::CreateParticleBuffer(unsigned long long sizeOfParticle, int maxParticles,
+	Microsoft::WRL::ComPtr<ID3D12Resource>& outBuffer)
+{
+	// Make a dynamic buffer to hold all particle data on GPU (ID312Resource)
+	// Note: We'll be overwriting this every frame with new lifetime data
+	Microsoft::WRL::ComPtr<ID3D12Resource> particleBuffer;
+
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	//resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;  // Read-Write Access
+
+	SIZE_T reservationSize = (SIZE_T)(sizeOfParticle * maxParticles);
+	reservationSize = (reservationSize + 255) / 256 * 256; // Integer division trick
+	resDesc.Width = reservationSize; // Doesn't have to be 256-byte aligned, but why not
+	resDesc.Height = 1;
+	resDesc.DepthOrArraySize = 1;
+	resDesc.MipLevels = 1;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.SampleDesc.Quality = 0;
+
+	resDesc.Alignment = 0;
+	resDesc.Format = DXGI_FORMAT_UNKNOWN;
+
+	D3D12_HEAP_PROPERTIES gpuHeapProp = D3D12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	device->CreateCommittedResource(
+		&gpuHeapProp,
+		D3D12_HEAP_FLAG_NONE, 
+		&resDesc,
+		D3D12_RESOURCE_STATE_COMMON, 
+		nullptr, 
+		IID_PPV_ARGS(&particleBuffer));
+
+	// Now that we have the texture, add to our list and make a CPU-side descriptor heap
+	// just for this texture's SRV.  Note that it would probably be better to put all 
+	// texture SRVs into the same descriptor heap, but we don't know how many we'll need
+	// until they're all loaded and this is a quick and dirty implementation!
+	textures.push_back(particleBuffer);
+	outBuffer = particleBuffer;
+
+	// Create the CPU-SIDE descriptor heap for our descriptor
+	D3D12_DESCRIPTOR_HEAP_DESC dhDesc = {};
+	dhDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE; // Non-shader visible for CPU-side-only descriptor heap!
+	dhDesc.NodeMask = 0;
+	dhDesc.NumDescriptors = 1;
+	dhDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descHeap;
+	device->CreateDescriptorHeap(&dhDesc, 
+		IID_PPV_ARGS(descHeap.GetAddressOf()));
+	cpuSideTextureDescriptorHeaps.push_back(descHeap);
+
+	// Create an SRV that points to a structured buffer of particles
+	// so we can grab this data in a vertex shader
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {}; // This description is correct
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Buffer.FirstElement = 0;
+	srvDesc.Buffer.NumElements = maxParticles;
+	srvDesc.Buffer.StructureByteStride = sizeOfParticle;
+	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+	// Create the SRV
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descHeap->GetCPUDescriptorHandleForHeapStart();
+	device->CreateShaderResourceView(particleBuffer.Get(), &srvDesc, cpuHandle);
+
+
+	return cpuHandle;
+}
+
 Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> D3D12Helper::GetCBVSRVDescriptorHeap()
 {
 	return cbvSrvDescriptorHeap;

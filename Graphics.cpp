@@ -717,7 +717,8 @@ void Graphics::RenderSimple(std::shared_ptr<Scene> scene,
 }
 
 
-void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount)
+void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount,
+	float dt, float currentTime)
 {
 	// Perform Frame Start operations
 	FrameStart();
@@ -872,7 +873,51 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 		Graphics::commandList->DrawIndexedInstanced(scene->GetSky()->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
 	}
 
-	// ImGui
+
+	//// Render Particles
+	for (std::shared_ptr<Emitter> emitterPtr : scene->GetEmitters())
+	{
+		// Different Pipeline Data
+		if (currentPipelineState != emitterPtr->GetPipelineState())
+		{
+			currentPipelineState = emitterPtr->GetPipelineState();
+			commandList->SetPipelineState(currentPipelineState.Get());
+			commandList->SetGraphicsRootSignature(Assets::GetInstance().GetRootSig(L"RootSigs/Particle").Get());
+			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			// Input Per Frame Data
+			commandList->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
+			commandList->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
+		}
+
+		// Emitter Specific Per Frame Data
+		VSEmitterPerFrameData vsEmitterData = {};
+		vsEmitterData.currentTime = currentTime;
+		vsEmitterData.acceleration = emitterPtr->acceleration;
+		vsEmitterData.lifeTime = emitterPtr->lifeTime;
+
+		D3D12_GPU_DESCRIPTOR_HANDLE handle =
+			d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsEmitterData), sizeof(VSEmitterPerFrameData));
+		commandList->SetGraphicsRootDescriptorTable(1, handle);
+
+		// Send Particle Data to GPU
+		emitterPtr->CopyParticlesToGPU(commandList, Device);
+
+		// Set the SRV descriptor handle for these Particles
+		// Note: This assumes that descriptor table 5 is for particles (as per our root sig)
+		commandList->SetGraphicsRootDescriptorTable(5, emitterPtr->GetGPUHandle());
+
+		// Set Vertex and Index Buffers
+		D3D12_INDEX_BUFFER_VIEW indexBuffView = emitterPtr->GetIndexBufferView();
+		Graphics::commandList->IASetVertexBuffers(0, 1, NULL);
+		Graphics::commandList->IASetIndexBuffer(&indexBuffView);
+
+		// Draw
+		Graphics::commandList->DrawIndexedInstanced(emitterPtr->GetNumLivingParticles() * 6, 1, 0, 0, 0);
+	}
+	
+
+	//// ImGui
 	{
 		ImGui::Render();
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> imGuiHeap = d3d12Helper.GetImGuiHeap();

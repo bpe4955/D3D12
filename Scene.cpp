@@ -20,6 +20,7 @@ std::vector<Light>& Scene::GetLights() { return lights; }
 std::vector<std::shared_ptr<Camera>>& Scene::GetCameras() { return cameras; }
 std::shared_ptr<Camera> Scene::GetCurrentCamera() { return currentCamera; }
 std::shared_ptr<Sky> Scene::GetSky() { return sky; }
+std::vector<std::shared_ptr<Emitter>>& Scene::GetEmitters() { return emitters; }
 bool Scene::OpaqueReady() { return opaqueEntitiesOrganized; }
 
 // Setters

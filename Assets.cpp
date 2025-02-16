@@ -734,7 +734,10 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 	srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// Create the root parameters
-	D3D12_ROOT_PARAMETER rootParams[5] = {};
+	int numRootParams = 5;
+	if (path.find(L"Particle") != std::wstring::npos)
+		numRootParams = 6;
+	D3D12_ROOT_PARAMETER* rootParams = new D3D12_ROOT_PARAMETER[numRootParams];
 	// CBV table param for vertex shader
 	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
@@ -758,6 +761,14 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 	rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParams[4].DescriptorTable.NumDescriptorRanges = 1;
 	rootParams[4].DescriptorTable.pDescriptorRanges = &srvRange;
+	// SRV table param for Particle VS
+	if (path.find(L"Particle") != std::wstring::npos)
+	{
+		rootParams[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		rootParams[5].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[5].DescriptorTable.pDescriptorRanges = &srvRange;
+	}
 
 	// Create a single static sampler (available to all pixel shaders at the same slot)
 	D3D12_TEXTURE_ADDRESS_MODE u = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -864,7 +875,7 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 	// Describe the root signature
 	D3D12_ROOT_SIGNATURE_DESC rootSig = {};
 	rootSig.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rootSig.NumParameters = ARRAYSIZE(rootParams);
+	rootSig.NumParameters = numRootParams;
 	rootSig.pParameters = rootParams;
 	rootSig.NumStaticSamplers = ARRAYSIZE(samplers);
 	rootSig.pStaticSamplers = samplers;
@@ -894,6 +905,8 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 
 	rootSigs.insert({ filename, rootSignature });
 
+
+	delete[] rootParams;
 	return rootSignature;
 }
 Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstring path)
@@ -1072,6 +1085,7 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 	D3D12_BLEND srcBlend = D3D12_BLEND_ONE;
 	D3D12_BLEND destBlend = D3D12_BLEND_ZERO;
 	D3D12_BLEND_OP blendOp = D3D12_BLEND_OP_ADD;
+	D3D12_BLEND_OP blendOpAlpha = D3D12_BLEND_OP_ADD;
 	if (d.contains("blendState"))
 	{
 		if (d["blendState"].contains("src") && d["blendState"]["src"].is_number_integer())
@@ -1079,7 +1093,7 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 		if (d["blendState"].contains("dest") && d["blendState"]["dest"].is_number_integer())
 		{ destBlend = d["blendState"]["dest"].get<D3D12_BLEND>(); }
 		if (d["blendState"].contains("blendOp") && d["blendState"]["blendOp"].is_number_integer())
-		{ blendOp = d["blendState"]["blendOp"].get<D3D12_BLEND_OP>(); }
+		{ blendOp = d["blendState"]["blendOp"].get<D3D12_BLEND_OP>(); blendOpAlpha = blendOp; }
 	}
 
 	// Pipeline state
@@ -1111,15 +1125,21 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 		psoDesc.DepthStencilState.DepthEnable = depthEnable;
 		psoDesc.DepthStencilState.DepthFunc = compFunc;
 		psoDesc.DepthStencilState.DepthWriteMask = depthWrite;
+		psoDesc.BlendState.RenderTarget[0].BlendEnable = true;
 		psoDesc.BlendState.RenderTarget[0].SrcBlend = srcBlend;
+		psoDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 		psoDesc.BlendState.RenderTarget[0].DestBlend = destBlend;
+		psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
 		psoDesc.BlendState.RenderTarget[0].BlendOp = blendOp;
+		psoDesc.BlendState.RenderTarget[0].BlendOpAlpha = blendOpAlpha;
 		psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 		// -- Misc ---
 		psoDesc.SampleMask = 0xffffffff;
 		// Create the pipe state object
-		Graphics::Device->CreateGraphicsPipelineState(&psoDesc,
+		HRESULT res = Graphics::Device->CreateGraphicsPipelineState(&psoDesc,
 			IID_PPV_ARGS(pipelineState.GetAddressOf()));
+
+		int i = 0;
 	}
 
 	pipelineStates.insert({ filename, pipelineState });

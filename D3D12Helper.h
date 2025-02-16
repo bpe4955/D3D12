@@ -40,6 +40,8 @@ public:
 		unsigned int dataStride,
 		unsigned int dataCount,
 		void* data);
+	D3D12_CPU_DESCRIPTOR_HANDLE CreateParticleBuffer(unsigned long long sizeOfParticle, int maxParticles,
+		Microsoft::WRL::ComPtr<ID3D12Resource>& outBuffer);
 	// Constant Buffer heap
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetCBVSRVDescriptorHeap();
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetImGuiHeap();

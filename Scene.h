@@ -5,6 +5,7 @@
 #include "Camera.h"
 #include "Entity.h"
 #include "Sky.h"
+#include "Emitter.h"
 
 #include <fstream>
 #include "nlohmann/json.hpp"
@@ -24,6 +25,7 @@ public:
 	std::vector<std::shared_ptr<Camera>>& GetCameras();
 	std::shared_ptr<Camera> GetCurrentCamera();
 	std::shared_ptr<Sky> GetSky();
+	std::vector<std::shared_ptr<Emitter>>& GetEmitters();
 	bool OpaqueReady();
 
 	// Setters
@@ -48,6 +50,7 @@ private:
 	std::vector<std::shared_ptr<Entity>> entities;
 	std::vector<Light> lights;
 	std::vector<std::shared_ptr<Camera>> cameras;
+	std::vector<std::shared_ptr<Emitter>> emitters;
 
 	// Singular elements
 	std::shared_ptr<Camera> currentCamera;

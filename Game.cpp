@@ -20,7 +20,7 @@
 #include <d3dcompiler.h>
 
 // Helper macro for getting a float between min and max
-#define RandomRange(min, max) (float)rand() / RAND_MAX * (max - min) + min
+#define RandomRange(min, max) ((float)rand() / RAND_MAX * (max - min) + min)
 
 // For the DirectX Math library
 using namespace DirectX;
@@ -236,7 +236,7 @@ void Game::ImGuiUpdate(float deltaTime)
 // Partcile UI data
 static float pos[4][3] = { 0.0f, 0.0f, 0.0f };
 static float posRand[4][3] = { 0.0f, 0.0f, 0.0f };
-static float startVel[4][3] = { 0.0f, 1.0f, 0.0f};
+static float startVel[4][3] = { 0.0f, 0.0f, 0.0f};
 static float velRand[4][3] = { 0.0f, 0.0f, 0.0f };
 static float acc[4][3] = { 0.0f, 0.0f, 0.0f };
 static int particlesPerSecond[4] = { 10, 10, 10, 10 };
@@ -289,6 +289,7 @@ void Game::BuildUI()
 			}
 			currentCameraIndex = 0;
 			scene->GetCurrentCamera()->UpdateProjectionMatrix(Window::AspectRatio());
+			CreateLights();
 		}
 
 		ImGui::TreePop();

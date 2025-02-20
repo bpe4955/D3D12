@@ -2,7 +2,7 @@
 #include "D3D12Helper.h"
 #include "Assets.h"
 // Helper macro for getting a float between min and max
-#define RandomRange(min, max) (float)rand() / RAND_MAX * (max - min) + min
+#define RandomRange(min, max) ((float)rand() / RAND_MAX * (max - min) + min)
 
 //
 // Construct

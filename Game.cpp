@@ -157,7 +157,18 @@ void Game::Update(float deltaTime, float totalTime)
 
 		if (scene->GetEmitters().size() == 0)
 		{
-			scene->GetEmitters().push_back(std::make_shared<Emitter>((int)100, (int)5, (float)5));
+			scene->GetEmitters().push_back(std::make_shared<Emitter>((int)500, (int)10, (float)15, 
+				Assets::GetInstance().GetTexture(L"Textures/Particles/PNG (Black background)/smoke_01")));
+			scene->GetEmitters()[0]->GetTransform()->SetPosition(XMFLOAT3(-15, 1, -10));
+			scene->GetEmitters()[0]->startVelocity = XMFLOAT3(1, 0, 1); // Straight up
+			scene->GetEmitters()[0]->velocityRandomRange = XMFLOAT3(1, 0, 1); 
+			scene->GetEmitters()[0]->acceleration = XMFLOAT3(0, 1, 0);
+			scene->GetEmitters()[0]->sizeStartMinMax = XMFLOAT2(0.05f, 0.25f);
+			scene->GetEmitters()[0]->sizeEndMinMax = XMFLOAT2(1.0f, 3.0f);
+			scene->GetEmitters()[0]->rotationStartMinMax = XMFLOAT2(-3.15f, 3.15f);
+			scene->GetEmitters()[0]->rotationEndMinMax = XMFLOAT2(-6.3f, 6.3f);
+			scene->GetEmitters()[0]->startColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+			scene->GetEmitters()[0]->endColor = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
 		}
 
 	}
@@ -222,6 +233,21 @@ void Game::ImGuiUpdate(float deltaTime)
 	BuildUI();
 }
 
+// Partcile UI data
+static float pos[4][3] = { 0.0f, 0.0f, 0.0f };
+static float posRand[4][3] = { 0.0f, 0.0f, 0.0f };
+static float startVel[4][3] = { 0.0f, 1.0f, 0.0f};
+static float velRand[4][3] = { 0.0f, 0.0f, 0.0f };
+static float acc[4][3] = { 0.0f, 0.0f, 0.0f };
+static int particlesPerSecond[4] = { 10, 10, 10, 10 };
+//static int maxParticles[4] = { 500, 500, 500, 500 };
+static float startRot[4][2] = { 0.0f, 0.0f };
+static float endRot[4][2] = { 0.0f, 0.0f };
+static float startSize[4][2] = { 1.0f, 1.0f };
+static float endSize[4][2] = { 1.0f, 1.0f };
+static float startColor[4][4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+static float endColor[4][4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 void Game::BuildUI()
 {
 	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
@@ -264,6 +290,47 @@ void Game::BuildUI()
 			currentCameraIndex = 0;
 			scene->GetCurrentCamera()->UpdateProjectionMatrix(Window::AspectRatio());
 		}
+
+		ImGui::TreePop();
+	}
+	if (scene->GetName() == "basicScene")
+	if (ImGui::TreeNode("Particle"))
+	{
+		for (int i = 0; i < scene->GetEmitters().size() && i < 4; i++)
+		{
+			if (ImGui::TreeNode(std::to_string(i).c_str()))
+			{
+				if (ImGui::DragInt("ParticlesPerSec", &particlesPerSecond[i], 1, 1, 500))
+					scene->GetEmitters()[i]->SetParticlesPerSecond(particlesPerSecond[i]);
+				/*if (ImGui::DragInt("Max Particles", &maxParticles[i], 1, 1, 1000))
+					scene->GetEmitters()[i]->SetMaxParticles(maxParticles[i]);*/
+				if (ImGui::DragFloat3("Position", pos[i], 0.05f, -100.0f, 100.0f))
+					scene->GetEmitters()[i]->GetTransform()->SetPosition(XMFLOAT3(pos[i][0], pos[i][1], pos[i][2]));
+				if (ImGui::DragFloat3("PositionRandomization", posRand[i], 0.05f, -100.0f, 100.0f))
+					scene->GetEmitters()[i]->positionRandomRange = XMFLOAT3(posRand[i][0], posRand[i][1], posRand[i][2]);
+				if (ImGui::DragFloat3("StartVelocity", startVel[i], 0.05f, -100.0f, 100.0f))
+					scene->GetEmitters()[i]->startVelocity = XMFLOAT3(startVel[i][0], startVel[i][1], startVel[i][2]);
+				if (ImGui::DragFloat3("VelocityRandomization", velRand[i], 0.05f, -100.0f, 100.0f))
+					scene->GetEmitters()[i]->velocityRandomRange = XMFLOAT3(velRand[i][0], velRand[i][1], velRand[i][2]);
+				if (ImGui::DragFloat3("Acceleration", acc[i], 0.05f, -100.0f, 100.0f))
+					scene->GetEmitters()[i]->acceleration = XMFLOAT3(acc[i][0], acc[i][1], acc[i][2]);
+				if (ImGui::DragFloat2("StartSize", startSize[i], 0.05f, -10.0f, 10.0f))
+					scene->GetEmitters()[i]->sizeStartMinMax = XMFLOAT2(startSize[i][0], startSize[i][1]);
+				if (ImGui::DragFloat2("EndSize", endSize[i], 0.05f, -10.0f, 10.0f))
+					scene->GetEmitters()[i]->sizeEndMinMax = XMFLOAT2(endSize[i][0], endSize[i][1]);
+				if (ImGui::DragFloat2("StartRot", startRot[i], 0.05f, -360.0f, 360.0f))
+					scene->GetEmitters()[i]->rotationStartMinMax = XMFLOAT2(startRot[i][0], startRot[i][1]);
+				if (ImGui::DragFloat2("EndRot", endRot[i], 0.05f, -360.0f, 360.0f))
+					scene->GetEmitters()[i]->rotationEndMinMax = XMFLOAT2(endRot[i][0], endRot[i][1]);
+				if (ImGui::ColorPicker4("StartColor", startColor[i]))
+					scene->GetEmitters()[i]->startColor = XMFLOAT4(startColor[i][0], startColor[i][1], startColor[i][2], startColor[i][3]);
+				if (ImGui::ColorPicker4("EndColor", endColor[i]))
+					scene->GetEmitters()[i]->endColor = XMFLOAT4(endColor[i][0], endColor[i][1], endColor[i][2], endColor[i][3]);
+
+				ImGui::TreePop();
+			}
+		}
+		
 
 		ImGui::TreePop();
 	}

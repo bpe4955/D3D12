@@ -46,7 +46,11 @@ struct VSEmitterPerFrameData
 	float currentTime;
 	DirectX::XMFLOAT3 acceleration;
 
+	DirectX::XMFLOAT4 startColor;
+	DirectX::XMFLOAT4 endColor;
+
 	float lifeTime;
+	DirectX::XMFLOAT3 padding;
 };
 
 struct PSPerFrameData

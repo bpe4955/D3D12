@@ -3,12 +3,16 @@
 struct VertexToPixel
 {
     float4 position : SV_POSITION;
-    
     float2 uv : TEXCOORD0;
-    //float4 colorTint : COLOR;
+    float4 colorTint : COLOR;
 };
 
-float4 main() : SV_TARGET
+Texture2D       Texture : register(t0);
+SamplerState    Sampler : register(s0);
+
+float4 main(VertexToPixel input) : SV_TARGET
 {
-	return float4(1.0f, 1.0f, 1.0f, 1.0f);
+	// Return the texture sample
+    return Texture.Sample(Sampler, input.uv) * input.colorTint;
+	//return float4(1.0f, 1.0f, 1.0f, 1.0f);
 }

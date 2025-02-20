@@ -10,19 +10,34 @@
 
 Emitter::Emitter(int _maxParticles, int _particlePerSecond,
 	float _lifeTime,
+	D3D12_CPU_DESCRIPTOR_HANDLE texture,
+	bool _isAdditive,
 	DirectX::XMFLOAT3 _emitterPosition,
 	DirectX::XMFLOAT3 _positionRandomRange,
 	DirectX::XMFLOAT3 _startVelocity,
 	DirectX::XMFLOAT3 _velocityRandomRange,
-	DirectX::XMFLOAT3 _emitterAcceleration) :
+	DirectX::XMFLOAT3 _emitterAcceleration,
+	DirectX::XMFLOAT2 _rotationStartMinMax,
+	DirectX::XMFLOAT2 _rotationEndMinMax,
+	DirectX::XMFLOAT2 _sizeStartMinMax,
+	DirectX::XMFLOAT2 _sizeEndMinMax,
+	DirectX::XMFLOAT4 _startColor,
+	DirectX::XMFLOAT4 _endColor) :
 	maxParticles(_maxParticles),
 	particles(nullptr),
-	particlePerSecond(_particlePerSecond),
+	particlesPerSecond(_particlePerSecond),
 	lifeTime(_lifeTime),
+	isAdditive(_isAdditive),
 	positionRandomRange(_positionRandomRange),
 	startVelocity(_startVelocity),
 	velocityRandomRange(_velocityRandomRange),
 	acceleration(_emitterAcceleration),
+	rotationStartMinMax(_rotationStartMinMax),
+	rotationEndMinMax(_rotationEndMinMax),
+	sizeStartMinMax(_sizeStartMinMax),
+	sizeEndMinMax(_sizeEndMinMax),
+	startColor(_startColor),
+	endColor(_endColor),
 	numLivingParticles(0),
 	firstLivingIndex(0),
 	firstDeadIndex(0),
@@ -34,13 +49,14 @@ Emitter::Emitter(int _maxParticles, int _particlePerSecond,
 	transform->SetPosition(_emitterPosition);
 
 	// Set up array and Resources
+	textureGPUHandle =
+		D3D12Helper::GetInstance().CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(texture, 1);
 	CreateParticlesAndResources();
 }
 
 Emitter::~Emitter()
 {
 	delete[] particles;
-	buffer->Unmap(0, NULL);
 }
 
 
@@ -58,6 +74,29 @@ Microsoft::WRL::ComPtr<ID3D12Resource> Emitter::GetBuffer() { return buffer; }
 D3D12_INDEX_BUFFER_VIEW Emitter::GetIndexBufferView() { return ibView; }
 D3D12_CPU_DESCRIPTOR_HANDLE Emitter::GetCPUHandle() { return structuredBuffCPUHandle; }
 D3D12_GPU_DESCRIPTOR_HANDLE Emitter::GetGPUHandle() { return structuredBuffGPUHandle; }
+D3D12_GPU_DESCRIPTOR_HANDLE Emitter::GetTextureGPUHandle() { return textureGPUHandle; }
+
+//
+// Setters
+//
+void Emitter::SetParticlesPerSecond(int _particlesPerSecond)
+{
+	particlesPerSecond = max(1,_particlesPerSecond);
+	secondsPerParticle = 1.0f / (float)particlesPerSecond;
+}
+
+//void Emitter::SetMaxParticles(int _maxParticles)
+//{
+//	D3D12Helper::GetInstance().WaitForGPU();
+//	maxParticles = max(1, _maxParticles);
+//	CreateParticlesAndResources();
+//
+//	// Reset Emission Details
+//	timeSinceLastEmit = 0.0f;
+//	numLivingParticles = 0;
+//	firstDeadIndex = 0;
+//	firstLivingIndex = 0;
+//}
 
 // 
 // Init
@@ -103,7 +142,7 @@ void Emitter::CreateParticlesAndResources()
 	// Create Pipeline Data
 	Assets& assets = Assets::GetInstance();
 	pipelineState = 
-		true ? assets.GetPiplineState(L"PipelineStates/ParticleAdditive") 
+		isAdditive ? assets.GetPiplineState(L"PipelineStates/ParticleAdditive")
 		: assets.GetPiplineState(L"PipelineStates/ParticleTransparent");
 	rootSig = assets.GetRootSig(L"RootSigs/Particle");
 }
@@ -282,6 +321,14 @@ void Emitter::EmitParticle(float currentTime)
 	particles[spawnIndex].StartVel.x += velocityRandomRange.x * RandomRange(-1.0f, 1.0f);
 	particles[spawnIndex].StartVel.y += velocityRandomRange.y * RandomRange(-1.0f, 1.0f);
 	particles[spawnIndex].StartVel.z += velocityRandomRange.z * RandomRange(-1.0f, 1.0f);
+
+	// Adjust start and end rotation values based on range
+	particles[spawnIndex].StartRot = RandomRange(rotationStartMinMax.x, rotationStartMinMax.y);
+	particles[spawnIndex].EndRot = RandomRange(rotationEndMinMax.x, rotationEndMinMax.y);
+
+	// Adjust start and end size values based on range
+	particles[spawnIndex].StartSize = RandomRange(sizeStartMinMax.x, sizeStartMinMax.y);
+	particles[spawnIndex].EndSize = RandomRange(sizeEndMinMax.x, sizeEndMinMax.y);
 
 	// Increment living count
 	numLivingParticles++;

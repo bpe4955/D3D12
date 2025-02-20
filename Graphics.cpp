@@ -859,7 +859,7 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 			Graphics::commandList->SetGraphicsRootDescriptorTable(2, cbHandlePS);
 		}
 		// Set the SRV descriptor handle for this sky's textures
-		// Note: This assumes that descriptor table 2 is for textures (as per our root sig)
+		// Note: This assumes that descriptor table 4 is for textures (as per our root sig)
 		Graphics::commandList->SetGraphicsRootDescriptorTable(4, scene->GetSky()->GetTextureGPUHandle());
 
 		// Grab the vertex buffer view and index buffer view from this entity’s mesh
@@ -889,12 +889,17 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 			commandList->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
 			commandList->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
 		}
+		// Set the SRV descriptor handle for this emitter's texture
+		// Note: This assumes that descriptor table 4 is for textures (as per our root sig)
+		Graphics::commandList->SetGraphicsRootDescriptorTable(4, emitterPtr->GetTextureGPUHandle());
 
 		// Emitter Specific Per Frame Data
 		VSEmitterPerFrameData vsEmitterData = {};
 		vsEmitterData.currentTime = currentTime;
 		vsEmitterData.acceleration = emitterPtr->acceleration;
 		vsEmitterData.lifeTime = emitterPtr->lifeTime;
+		vsEmitterData.startColor = emitterPtr->startColor;
+		vsEmitterData.endColor = emitterPtr->endColor;
 
 		D3D12_GPU_DESCRIPTOR_HANDLE handle =
 			d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsEmitterData), sizeof(VSEmitterPerFrameData));

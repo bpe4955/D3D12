@@ -38,6 +38,7 @@ public:
 	void AddEntity(std::shared_ptr<Entity> entity);
 	void AddLight(Light light);
 	void AddCamera(std::shared_ptr<Camera> camera);
+	void AddEmitter(std::shared_ptr<Emitter> emitter);
 
 	// Functions
 	void Clear();

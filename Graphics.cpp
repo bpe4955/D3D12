@@ -900,6 +900,7 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 		vsEmitterData.lifeTime = emitterPtr->lifeTime;
 		vsEmitterData.startColor = emitterPtr->startColor;
 		vsEmitterData.endColor = emitterPtr->endColor;
+		vsEmitterData.constrainYAxis = emitterPtr->constrainYAxis;
 
 		D3D12_GPU_DESCRIPTOR_HANDLE handle =
 			d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsEmitterData), sizeof(VSEmitterPerFrameData));

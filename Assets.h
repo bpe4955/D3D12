@@ -13,6 +13,7 @@
 #include "Material.h"
 #include "Sky.h"
 #include "Scene.h"
+#include "Emitter.h"
 
 
 class Assets
@@ -126,6 +127,7 @@ private:
 	std::shared_ptr<Camera> ParseCamera(nlohmann::json jsonCamera);
 	Light ParseLight(nlohmann::json jsonLight);
 	std::shared_ptr<Entity> ParseEntity(nlohmann::json jsonEntity);
+	std::shared_ptr<Emitter> ParseEmitter(nlohmann::json jsonEmitter);
 	void ParseComplexMesh(std::wstring path,
 		std::vector<std::shared_ptr<Mesh>>& meshes,
 		std::vector<std::shared_ptr<Material>>& materials,

@@ -39,6 +39,7 @@ void Scene::SetSky(std::shared_ptr<Sky> _sky) { sky = _sky; }
 void Scene::AddEntity(std::shared_ptr<Entity> entity) { entities.push_back(entity); }
 void Scene::AddLight(Light light) { lights.push_back(light); }
 void Scene::AddCamera(std::shared_ptr<Camera> camera) { cameras.push_back(camera); }
+void Scene::AddEmitter(std::shared_ptr<Emitter> emitter) { emitters.push_back(emitter); }
 
 // Functions
 void Scene::Clear()

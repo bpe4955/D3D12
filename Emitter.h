@@ -23,10 +23,11 @@ struct Particle
 class Emitter
 {
 public:
-	Emitter(int _maxParticles, int particlePerSecond, 
+	Emitter(int _maxParticles, int particlePerSecond,
 		float _lifeTime,
 		D3D12_CPU_DESCRIPTOR_HANDLE texture,
 		bool _isAdditive = true,
+		bool _constrainYAxis = false,
 		DirectX::XMFLOAT3 _emitterPosition = DirectX::XMFLOAT3(0, 0, 0),
 		DirectX::XMFLOAT3 _positionRandomRange = DirectX::XMFLOAT3(0, 0, 0),
 		DirectX::XMFLOAT3 _startVelocity = DirectX::XMFLOAT3(0, 1.0f, 0),  // left/right, down/up, front/back
@@ -64,6 +65,7 @@ public:
 	DirectX::XMFLOAT3 startVelocity;
 	DirectX::XMFLOAT4 startColor;
 	DirectX::XMFLOAT4 endColor;
+	bool constrainYAxis;
 
 	// Particle randomization ranges
 	DirectX::XMFLOAT3 positionRandomRange;

@@ -155,12 +155,13 @@ void Game::Update(float deltaTime, float totalTime)
 		entities.back()->GetTransform()->SetPosition(XMFLOAT3((float)sin(totalTime), 1, (float)cos(totalTime)));
 		entities.back()->GetTransform()->Rotate(XMFLOAT3(0, (float)sin(totalTime) / 58, 0));
 
+		/*
 		if (scene->GetEmitters().size() == 0)
 		{
 			scene->GetEmitters().push_back(std::make_shared<Emitter>((int)500, (int)10, (float)15, 
 				Assets::GetInstance().GetTexture(L"Textures/Particles/PNG (Black background)/smoke_01")));
 			scene->GetEmitters()[0]->GetTransform()->SetPosition(XMFLOAT3(-15, 1, -10));
-			scene->GetEmitters()[0]->startVelocity = XMFLOAT3(1, 0, 1); // Straight up
+			scene->GetEmitters()[0]->startVelocity = XMFLOAT3(1, 0, 1);
 			scene->GetEmitters()[0]->velocityRandomRange = XMFLOAT3(1, 0, 1); 
 			scene->GetEmitters()[0]->acceleration = XMFLOAT3(0, 1, 0);
 			scene->GetEmitters()[0]->sizeStartMinMax = XMFLOAT2(0.05f, 0.25f);
@@ -169,8 +170,21 @@ void Game::Update(float deltaTime, float totalTime)
 			scene->GetEmitters()[0]->rotationEndMinMax = XMFLOAT2(-6.3f, 6.3f);
 			scene->GetEmitters()[0]->startColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
 			scene->GetEmitters()[0]->endColor = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
-		}
 
+			scene->GetEmitters().push_back(std::make_shared<Emitter>((int)500, (int)150, (float)2.5,
+				Assets::GetInstance().GetTexture(L"Textures/Particles/PNG (Transparent)/trace_07"),
+				false));
+			scene->GetEmitters()[1]->GetTransform()->SetPosition(XMFLOAT3(0, 25, 0));
+			scene->GetEmitters()[1]->positionRandomRange = XMFLOAT3(15, 0, 10);
+			scene->GetEmitters()[1]->startVelocity = XMFLOAT3(0, -10, 0);
+			scene->GetEmitters()[1]->acceleration = XMFLOAT3(0, -10, 0);
+			scene->GetEmitters()[1]->sizeStartMinMax = XMFLOAT2(0.25f, 0.25f);
+			scene->GetEmitters()[1]->sizeEndMinMax = XMFLOAT2(0.25f, 0.25f);
+			scene->GetEmitters()[1]->startColor = XMFLOAT4(0.77f, 0.85f, 0.1f, 0.6f);
+			scene->GetEmitters()[1]->endColor = XMFLOAT4(0.77f, 0.85f, 0.1f, 0.6f);
+
+		}
+		*/
 	}
 
 	if (Input::KeyPress(VK_TAB))
@@ -234,6 +248,7 @@ void Game::ImGuiUpdate(float deltaTime)
 }
 
 // Partcile UI data
+static float lifeTime[4] = { 5.0f, 5.0f, 5.0f, 5.0f, };
 static float pos[4][3] = { 0.0f, 0.0f, 0.0f };
 static float posRand[4][3] = { 0.0f, 0.0f, 0.0f };
 static float startVel[4][3] = { 0.0f, 0.0f, 0.0f};
@@ -303,6 +318,8 @@ void Game::BuildUI()
 			{
 				if (ImGui::DragInt("ParticlesPerSec", &particlesPerSecond[i], 1, 1, 500))
 					scene->GetEmitters()[i]->SetParticlesPerSecond(particlesPerSecond[i]);
+				if (ImGui::DragFloat("LifeTime", &lifeTime[i], 1, 1, 50))
+					scene->GetEmitters()[i]->lifeTime = lifeTime[i];
 				/*if (ImGui::DragInt("Max Particles", &maxParticles[i], 1, 1, 1000))
 					scene->GetEmitters()[i]->SetMaxParticles(maxParticles[i]);*/
 				if (ImGui::DragFloat3("Position", pos[i], 0.05f, -100.0f, 100.0f))

@@ -1519,7 +1519,15 @@ std::shared_ptr<Scene> Assets::LoadScene(std::wstring path)
 					scene->GetEntities()[index]->GetTransform().get());
 			}
 		}
+	}
 
+	// Check for emitters
+	if (sceneJson.contains("emitters") && sceneJson["emitters"].is_array())
+	{
+		for (int e = 0; e < sceneJson["emitters"].size(); e++)
+		{
+			scene->AddEmitter(ParseEmitter(sceneJson["emitters"][e]));
+		}
 	}
 
 	scene->InitialSort();
@@ -1683,6 +1691,194 @@ std::shared_ptr<Entity> Assets::ParseEntity(nlohmann::json jsonEntity)
 	entity->GetTransform()->SetScale(sc);
 	return entity;
 }
+
+std::shared_ptr<Emitter> Assets::ParseEmitter(nlohmann::json jsonEmitter)
+{
+	std::shared_ptr<Emitter> emitter;
+
+	// Necessary data
+	{
+		int maxParticles = jsonEmitter["maxParticles"].get<int>();
+		int particlesPerSecond = jsonEmitter["particlesPerSecond"].get<int>();
+		float lifeTime = jsonEmitter["lifeTime"].get<float>();
+		
+		bool isAdditive = true;
+		if (jsonEmitter.contains("isAdditive"))
+		{
+			std::string input = jsonEmitter["isAdditive"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "ZERO" || input == "FALSE" || input == "0")
+				isAdditive = false;
+		}
+
+		std::wstring textureName = NarrowToWide(jsonEmitter["texture"].get<std::string>());
+		D3D12_CPU_DESCRIPTOR_HANDLE texture = GetTexture(textureName);
+
+		emitter = std::make_shared<Emitter>(maxParticles, particlesPerSecond, lifeTime, texture, isAdditive);
+	}
+
+	// Position
+	if (jsonEmitter.contains("transform"))
+	{
+		nlohmann::json tr = jsonEmitter["transform"];
+
+		DirectX::XMFLOAT3 pos = { 0, 0, 0 };
+		pos.x = tr["position"][0].get<float>();
+		pos.y = tr["position"][1].get<float>();
+		pos.z = tr["position"][2].get<float>();
+
+		emitter->GetTransform()->SetPosition(pos);
+	}
+	if (jsonEmitter.contains("positionRandomRange"))
+	{
+		DirectX::XMFLOAT3 pos = { 0, 0, 0 };
+		pos.x = jsonEmitter["positionRandomRange"][0].get<float>();
+		pos.y = jsonEmitter["positionRandomRange"][1].get<float>();
+		pos.z = jsonEmitter["positionRandomRange"][2].get<float>();
+
+		emitter->positionRandomRange = pos;
+	}
+
+	// Velocity
+	if (jsonEmitter.contains("startVelocity"))
+	{
+		DirectX::XMFLOAT3 vel = { 0, 0, 0 };
+		vel.x = jsonEmitter["startVelocity"][0].get<float>();
+		vel.y = jsonEmitter["startVelocity"][1].get<float>();
+		vel.z = jsonEmitter["startVelocity"][2].get<float>();
+
+		emitter->startVelocity = vel;
+	}
+	if (jsonEmitter.contains("velocityRandomRange"))
+	{
+		DirectX::XMFLOAT3 vel = { 0, 0, 0 };
+		vel.x = jsonEmitter["velocityRandomRange"][0].get<float>();
+		vel.y = jsonEmitter["velocityRandomRange"][1].get<float>();
+		vel.z = jsonEmitter["velocityRandomRange"][2].get<float>();
+
+		emitter->velocityRandomRange = vel;
+	}
+
+	// Acceleration
+	if (jsonEmitter.contains("acceleration"))
+	{
+		DirectX::XMFLOAT3 acc = { 0, 0, 0 };
+		acc.x = jsonEmitter["acceleration"][0].get<float>();
+		acc.y = jsonEmitter["acceleration"][1].get<float>();
+		acc.z = jsonEmitter["acceleration"][2].get<float>();
+
+		emitter->acceleration = acc;
+	}
+
+	// Rotation
+	if (jsonEmitter.contains("rotation"))
+	{
+		float rot = jsonEmitter["rotation"].get<float>();
+
+		emitter->rotationStartMinMax = DirectX::XMFLOAT2(rot, rot);
+		emitter->rotationEndMinMax = DirectX::XMFLOAT2(rot, rot);
+	}
+	else
+	{
+		if (jsonEmitter.contains("rotationStartMinMax"))
+		{
+			DirectX::XMFLOAT2 rot = { 0, 0 };
+			rot.x = jsonEmitter["rotationStartMinMax"][0].get<float>();
+			rot.y = jsonEmitter["rotationStartMinMax"][1].get<float>();
+
+			emitter->rotationStartMinMax = rot;
+		}
+		if (jsonEmitter.contains("rotationEndMinMax"))
+		{
+			DirectX::XMFLOAT2 rot = { 0, 0 };
+			rot.x = jsonEmitter["rotationEndMinMax"][0].get<float>();
+			rot.y = jsonEmitter["rotationEndMinMax"][1].get<float>();
+
+			emitter->rotationEndMinMax = rot;
+		}
+	}
+	if (jsonEmitter.contains("constrainYAxis"))
+	{
+		bool constrainYAxis = false;
+		std::string input = jsonEmitter["constrainYAxis"].get<std::string>();
+		std::transform(input.begin(), input.end(), input.begin(),
+			[](unsigned char c) { return std::toupper(c); });
+
+		if (input == "ONE" || input == "TRUE" || input == "1")
+			constrainYAxis = true;
+
+		emitter->constrainYAxis = constrainYAxis;
+	}
+
+	// Size
+	if (jsonEmitter.contains("size"))
+	{
+		float size = jsonEmitter["size"].get<float>();
+
+		emitter->sizeStartMinMax = DirectX::XMFLOAT2(size, size);
+		emitter->sizeEndMinMax = DirectX::XMFLOAT2(size, size);
+	}
+	else
+	{
+		if (jsonEmitter.contains("sizeStartMinMax"))
+		{
+			DirectX::XMFLOAT2 size = { 0, 0 };
+			size.x = jsonEmitter["sizeStartMinMax"][0].get<float>();
+			size.y = jsonEmitter["sizeStartMinMax"][1].get<float>();
+
+			emitter->sizeStartMinMax = size;
+		}
+		if (jsonEmitter.contains("sizeEndMinMax"))
+		{
+			DirectX::XMFLOAT2 size = { 0, 0 };
+			size.x = jsonEmitter["sizeEndMinMax"][0].get<float>();
+			size.y = jsonEmitter["sizeEndMinMax"][1].get<float>();
+
+			emitter->sizeEndMinMax = size;
+		}
+	}
+
+	// Color
+	if (jsonEmitter.contains("color"))
+	{
+		DirectX::XMFLOAT4 color = { 1, 1, 1, 1 };
+		color.x = jsonEmitter["color"][0].get<float>();
+		color.y = jsonEmitter["color"][1].get<float>();
+		color.z = jsonEmitter["color"][2].get<float>();
+		color.w = jsonEmitter["color"][3].get<float>();
+
+		emitter->startColor = color;
+		emitter->endColor = color;
+	}
+	else
+	{
+		if (jsonEmitter.contains("startColor"))
+		{
+			DirectX::XMFLOAT4 color = { 1, 1, 1, 1 };
+			color.x = jsonEmitter["startColor"][0].get<float>();
+			color.y = jsonEmitter["startColor"][1].get<float>();
+			color.z = jsonEmitter["startColor"][2].get<float>();
+			color.w = jsonEmitter["startColor"][3].get<float>();
+
+			emitter->startColor = color;
+		}
+		if (jsonEmitter.contains("endColor"))
+		{
+			DirectX::XMFLOAT4 color = { 1, 1, 1, 1 };
+			color.x = jsonEmitter["endColor"][0].get<float>();
+			color.y = jsonEmitter["endColor"][1].get<float>();
+			color.z = jsonEmitter["endColor"][2].get<float>();
+			color.w = jsonEmitter["endColor"][3].get<float>();
+
+			emitter->endColor = color;
+		}
+	}
+
+	return emitter;
+}
+
 // Using Assimp to import meshes and materials
 void Assets::ParseComplexMesh(std::wstring path, 
 	std::vector<std::shared_ptr<Mesh>>& meshes, 

@@ -50,7 +50,8 @@ struct VSEmitterPerFrameData
 	DirectX::XMFLOAT4 endColor;
 
 	float lifeTime;
-	DirectX::XMFLOAT3 padding;
+	bool constrainYAxis;
+	DirectX::XMFLOAT2 padding;
 };
 
 struct PSPerFrameData

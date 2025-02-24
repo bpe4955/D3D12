@@ -49,7 +49,8 @@ void Game::Initialize()
 	CreateLights();
 
 	// Ensure the command list is closed going into Draw for the first time
-	Graphics::commandList->Close();
+	for(int i=0; i<Graphics::numCommandLists; i++)
+		Graphics::commandList[i]->Close();
 }
 
 

@@ -31,10 +31,11 @@ public:
 	// Initialization for singleton
 	void Initialize(
 		Microsoft::WRL::ComPtr<ID3D12Device> device,
-		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList,
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList[],
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue,
-		Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators,
-		unsigned int numBackBuffers);
+		//Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators,
+		unsigned int numBackBuffers,
+		unsigned int numCommandLists);
 	// Resource creation
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateStaticBuffer(
 		unsigned int dataStride,
@@ -66,11 +67,12 @@ private:
 	// Note: We're assuming a single command list for the entire
 	// engine at this point. That's not always true for more
 	// complex engines but should be fine for now
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>* commandList = {};
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators = {};
+	//Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators = {};
 	// Basic CPU/GPU synchronization
 	unsigned int numBackBuffers = 3;
+	unsigned int numCommandLists = 2;
 	Microsoft::WRL::ComPtr<ID3D12Fence> waitFence = {};
 	HANDLE waitFenceEvent = {};
 	unsigned long waitFenceCounter = 0;

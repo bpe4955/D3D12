@@ -61,7 +61,7 @@ VertexToPixel main(uint id : SV_VertexID)
 
 	// Constant accleration function to determine the particle's
 	// current location based on age, start velocity and accel
-    float3 pos = acceleration * age * age / 2.0f + p.StartVelocity * age + p.StartPosition;
+    float3 pos = (acceleration * (age * age / 2.0f)) + (p.StartVelocity * age) + p.StartPosition;
 
 	// Size interpolation
     float size = lerp(p.StartSize, p.EndSize, agePercent);

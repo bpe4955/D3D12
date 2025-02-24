@@ -19,17 +19,19 @@ D3D12Helper::~D3D12Helper()
 // --------------------------------------------------------
 void D3D12Helper::Initialize(
 	Microsoft::WRL::ComPtr<ID3D12Device> device,
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList,
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList[],
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue,
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators,
-	unsigned int numBackBuffers)
+	//Microsoft::WRL::ComPtr<ID3D12CommandAllocator>* commandAllocators,
+	unsigned int numBackBuffers,
+	unsigned int numCommandLists)
 {
 	// Save objects
 	this->device = device;
 	this->commandList = commandList;
 	this->commandQueue = commandQueue;
-	this->commandAllocators = commandAllocators;
+	//this->commandAllocators = commandAllocators;
 	this->numBackBuffers = numBackBuffers;
+	this->numCommandLists = numCommandLists;
 	// Create the fence for basic synchronization
 	device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(waitFence.GetAddressOf()));
 	waitFenceEvent = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
@@ -53,10 +55,14 @@ void D3D12Helper::Initialize(
 // --------------------------------------------------------
 void D3D12Helper::ExecuteCommandList()
 {
-	// Close the current list and execute it as our only list
-	commandList->Close();
-	ID3D12CommandList* lists[] = { commandList.Get() };
-	commandQueue->ExecuteCommandLists(1, lists);
+	// Close the current lists and execute them
+	std::vector<ID3D12CommandList*> lists(numCommandLists);
+	for (unsigned int i = 0; i < numCommandLists; i++)
+	{
+		commandList[i]->Close();
+		lists[i] = commandList[i].Get();
+	}
+	commandQueue->ExecuteCommandLists(numCommandLists, &lists[0]);
 }
 // --------------------------------------------------------
 // Makes our C++ code wait for the GPU to finish its
@@ -497,7 +503,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3D12Helper::CreateParticleBuffer(unsigned long long
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.Buffer.FirstElement = 0;
 	srvDesc.Buffer.NumElements = maxParticles;
-	srvDesc.Buffer.StructureByteStride = sizeOfParticle;
+	srvDesc.Buffer.StructureByteStride = (UINT)sizeOfParticle;
 	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 	// Create the SRV

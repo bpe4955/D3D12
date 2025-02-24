@@ -15,12 +15,13 @@ namespace Graphics
 {
 	// --- GLOBAL VARS ---
 	inline static const unsigned int numBackBuffers = 3;
+	inline static const unsigned int numCommandLists = 2;
 	inline unsigned int currentSwapBuffer;
 	inline Microsoft::WRL::ComPtr<ID3D12Device> Device;
 	inline Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain;
-	inline Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocators[numBackBuffers];
+	inline Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocators[numBackBuffers][numCommandLists];
 	inline Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
-	inline Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
+	inline Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList[numCommandLists];
 	inline size_t rtvDescriptorSize;
 	inline Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvHeap;
 	inline Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvHeap;
@@ -46,7 +47,7 @@ namespace Graphics
 	void PrintDebugMessages();
 
 	// --- Renderer ---
-	void RenderSimple(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
+	//void RenderSimple(std::shared_ptr<Scene> scene, unsigned int activeLightCount);
 	void RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount,
 		float dt = 0,
 		float currentTime = 0);

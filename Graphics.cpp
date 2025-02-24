@@ -27,76 +27,6 @@ namespace Graphics
 		BOOL isFullscreen = false;
 		D3D_FEATURE_LEVEL featureLevel;
 		Microsoft::WRL::ComPtr<ID3D12InfoQueue> InfoQueue;
-
-		// -- Renderer ---
-		void FrameStart();
-		void FrameEnd();
-		void FrameStart()
-		{
-			D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
-			// Reset allocator associated with the current buffer
-			// and set up the command list to use that allocator
-			Graphics::commandAllocators[Graphics::currentSwapBuffer]->Reset();
-			Graphics::commandList->Reset(Graphics::commandAllocators[Graphics::currentSwapBuffer].Get(), 0);
-
-			// Grab the current back buffer for this frame
-			Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer = Graphics::backBuffers[Graphics::currentSwapBuffer];
-			// Clearing the render target
-			{
-				// Transition the back buffer from present to render target
-				D3D12_RESOURCE_BARRIER rb = {};
-				rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-				rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-				rb.Transition.pResource = currentBackBuffer.Get();
-				rb.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-				rb.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-				rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-				Graphics::commandList->ResourceBarrier(1, &rb);
-				// Background color (Cornflower Blue in this case) for clearing
-				//float color[] = { 0.4f, 0.6f, 0.75f, 1.0f };
-				float color[] = { 0.1f, 0.15f, 0.1875f, 1.0f };
-				// Clear the RTV
-				Graphics::commandList->ClearRenderTargetView(
-					Graphics::rtvHandles[Graphics::currentSwapBuffer],
-					color,
-					0, 0); // No scissor rectangles
-				// Clear the depth buffer, too
-				Graphics::commandList->ClearDepthStencilView(
-					Graphics::dsvHandle,
-					D3D12_CLEAR_FLAG_DEPTH,
-					1.0f, // Max depth = 1.0f
-					0, // Not clearing stencil, but need a value
-					0, 0); // No scissor rects
-			}
-		}
-		void FrameEnd()
-		{
-			D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
-			// Eventually would put UI rendering here
-
-			// Present
-			{
-				// Transition back to present
-				D3D12_RESOURCE_BARRIER rb = {};
-				rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-				rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-				rb.Transition.pResource = backBuffers[currentSwapBuffer].Get();
-				rb.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-				rb.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-				rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-				Graphics::commandList->ResourceBarrier(1, &rb);
-				// Must occur BEFORE present
-				D3D12Helper::GetInstance().ExecuteCommandList();
-				// Present the current back buffer
-				bool vsyncNecessary = Graphics::VsyncState();
-				Graphics::swapChain->Present(
-					vsyncNecessary ? 1 : 0,
-					vsyncNecessary ? 0 : DXGI_PRESENT_ALLOW_TEARING);
-
-				// Figure out which buffer is next
-				Graphics::currentSwapBuffer = d3d12Helper.SyncSwapChain(Graphics::currentSwapBuffer);
-			}
-		}
 	}
 }
 
@@ -204,26 +134,32 @@ HRESULT Graphics::Initialize(unsigned int windowWidth, unsigned int windowHeight
 	// Set up DX12 command allocator / queue / list,
 	// which are necessary pieces for issuing standard API calls
 	{
-		// Set up allocator
+		// Set up allocators
 		for (unsigned int i = 0; i < numBackBuffers; i++)
 		{
-			// Set up allocators
-			Device->CreateCommandAllocator(
-				D3D12_COMMAND_LIST_TYPE_DIRECT,
-				IID_PPV_ARGS(commandAllocators[i].GetAddressOf()));
+			for (unsigned int j = 0; j < numCommandLists; j++)
+			{
+				Device->CreateCommandAllocator(
+					D3D12_COMMAND_LIST_TYPE_DIRECT,
+					IID_PPV_ARGS(commandAllocators[i][j].GetAddressOf()));
+			}
 		}
 		// Command queue
 		D3D12_COMMAND_QUEUE_DESC qDesc = {};
 		qDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		qDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		Device->CreateCommandQueue(&qDesc, IID_PPV_ARGS(commandQueue.GetAddressOf()));
-		// Command list
-		Device->CreateCommandList(
-			0, // Which physical GPU will handle these tasks? 0 for single GPU setup
-			D3D12_COMMAND_LIST_TYPE_DIRECT, // Type of list - direct is for standard API calls
-			commandAllocators[0].Get(), // The allocator for this list
-			0, // Initial pipeline state - none for now
-			IID_PPV_ARGS(commandList.GetAddressOf()));
+		// Command lists
+		for (unsigned int i = 0; i < numCommandLists; i++)
+		{
+			Device->CreateCommandList(
+				0, // Which physical GPU will handle these tasks? 0 for single GPU setup
+				D3D12_COMMAND_LIST_TYPE_DIRECT, // Type of list - direct is for standard API calls
+				commandAllocators[0][i].Get(), // The allocator for this list
+				0, // Initial pipeline state - none for now
+				IID_PPV_ARGS(commandList[i].GetAddressOf()));
+
+		}
 	}
 
 	// Now that we have a device and a command list,
@@ -234,8 +170,9 @@ HRESULT Graphics::Initialize(unsigned int windowWidth, unsigned int windowHeight
 			Device,
 			commandList,
 			commandQueue,
-			commandAllocators,
-			numBackBuffers);
+			//commandAllocators,
+			numBackBuffers,
+			numCommandLists);
 	}
 
 	// Swap chain creation
@@ -556,6 +493,109 @@ void Graphics::PrintDebugMessages()
 	InfoQueue->ClearStoredMessages();
 }
 
+// --------------------------------------------------------
+// Rendering Private Functions
+// --------------------------------------------------------
+namespace
+{
+	void FrameStart();
+	void FrameEnd();
+	void FrameStart()
+	{
+		D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
+		// Reset allocator associated with the current buffer
+		// and set up the command list to use that allocator
+		for (unsigned int i = 0; i < Graphics::numCommandLists; i++)
+		{
+			Graphics::commandAllocators[Graphics::currentSwapBuffer][i]->Reset();
+			Graphics::commandList[i]->Reset(Graphics::commandAllocators[Graphics::currentSwapBuffer][i].Get(), 0);
+		}
+
+		// Grab the current back buffer for this frame
+		Microsoft::WRL::ComPtr<ID3D12Resource> currentBackBuffer = Graphics::backBuffers[Graphics::currentSwapBuffer];
+		// Clearing the render target
+		{
+			// Transition the back buffer from present to render target
+			D3D12_RESOURCE_BARRIER rb = {};
+			rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+			rb.Transition.pResource = currentBackBuffer.Get();
+			rb.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+			rb.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			Graphics::commandList[0]->ResourceBarrier(1, &rb);
+			// Background color (Cornflower Blue in this case) for clearing
+			//float color[] = { 0.4f, 0.6f, 0.75f, 1.0f };
+			float color[] = { 0.1f, 0.15f, 0.1875f, 1.0f };
+			// Clear the RTV
+			Graphics::commandList[0]->ClearRenderTargetView(
+				Graphics::rtvHandles[Graphics::currentSwapBuffer],
+				color,
+				0, 0); // No scissor rectangles
+			// Clear the depth buffer, too
+			Graphics::commandList[0]->ClearDepthStencilView(
+				Graphics::dsvHandle,
+				D3D12_CLEAR_FLAG_DEPTH,
+				1.0f, // Max depth = 1.0f
+				0, // Not clearing stencil, but need a value
+				0, 0); // No scissor rects
+		}
+
+		// Set up other commands for rendering
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = d3d12Helper.GetCBVSRVDescriptorHeap();
+		for (unsigned int i = 0; i < Graphics::numCommandLists; i++)
+		{
+			Graphics::commandList[i]->OMSetRenderTargets(1, &Graphics::rtvHandles[Graphics::currentSwapBuffer], true, &Graphics::dsvHandle);
+			Graphics::commandList[i]->RSSetViewports(1, &Graphics::viewport);
+			Graphics::commandList[i]->RSSetScissorRects(1, &Graphics::scissorRect);
+
+			Graphics::commandList[i]->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
+		}
+	}
+	void FrameEnd()
+	{
+		D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
+		//// ImGui
+		{
+			Graphics::commandList[Graphics::numCommandLists-1]->OMSetRenderTargets(1, &Graphics::rtvHandles[Graphics::currentSwapBuffer], true, &Graphics::dsvHandle);
+			Graphics::commandList[Graphics::numCommandLists-1]->RSSetViewports(1, &Graphics::viewport);
+			
+			ImGui::Render();
+			Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> imGuiHeap = d3d12Helper.GetImGuiHeap();
+			Graphics::commandList[Graphics::numCommandLists-1]->SetDescriptorHeaps(1, imGuiHeap.GetAddressOf());
+			ImDrawData* drawData = ImGui::GetDrawData();
+			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), Graphics::commandList[Graphics::numCommandLists - 1].Get());
+		}
+
+		// Present
+		{
+			// Transition back to present
+			D3D12_RESOURCE_BARRIER rb = {};
+			rb.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			rb.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+			rb.Transition.pResource = Graphics::backBuffers[Graphics::currentSwapBuffer].Get();
+			rb.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			rb.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+			rb.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			Graphics::commandList[Graphics::numCommandLists - 1]->ResourceBarrier(1, &rb);
+			// Must occur BEFORE present
+			D3D12Helper::GetInstance().ExecuteCommandList();
+			// Present the current back buffer
+			bool vsyncNecessary = Graphics::VsyncState();
+			Graphics::swapChain->Present(
+				vsyncNecessary ? 1 : 0,
+				vsyncNecessary ? 0 : DXGI_PRESENT_ALLOW_TEARING);
+
+			// Figure out which buffer is next
+			Graphics::currentSwapBuffer = d3d12Helper.SyncSwapChain(Graphics::currentSwapBuffer);
+		}
+	}
+}
+
+// --------------------------------------------------------
+// Rendering Public Functions
+// --------------------------------------------------------
+/*
 void Graphics::RenderSimple(std::shared_ptr<Scene> scene, 
 	unsigned int activeLightCount)
 {
@@ -715,7 +755,7 @@ void Graphics::RenderSimple(std::shared_ptr<Scene> scene,
 
 	FrameEnd();
 }
-
+*/
 
 void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int activeLightCount,
 	float dt, float currentTime)
@@ -725,12 +765,6 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 
 	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
 
-	// Set up other commands for rendering
-	commandList->OMSetRenderTargets(1, &rtvHandles[currentSwapBuffer], true, &dsvHandle);
-	commandList->RSSetViewports(1, &viewport);
-	commandList->RSSetScissorRects(1, &scissorRect);
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = d3d12Helper.GetCBVSRVDescriptorHeap();
-	commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
 
 	// Collect all per-frame data and copy to GPU
 	// -- VS
@@ -773,13 +807,13 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 				if (currentPipelineState != currentMaterial->GetPipelineState())
 				{
 					currentPipelineState = currentMaterial->GetPipelineState();
-					commandList->SetPipelineState(currentPipelineState.Get());
-					commandList->SetGraphicsRootSignature(currentMaterial->GetRootSignature().Get());
-					commandList->IASetPrimitiveTopology(currentMaterial->GetTopology());
+					commandList[0]->SetPipelineState(currentPipelineState.Get());
+					commandList[0]->SetGraphicsRootSignature(currentMaterial->GetRootSignature().Get());
+					commandList[0]->IASetPrimitiveTopology(currentMaterial->GetTopology());
 
 					// Input Per Frame Data
-					commandList->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
-					commandList->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
+					commandList[0]->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
+					commandList[0]->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
 				}
 
 				// Set Pixel Shader Data
@@ -791,11 +825,11 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 				D3D12_GPU_DESCRIPTOR_HANDLE cbHandlePS = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
 					(void*)(&psData), sizeof(PSPerMaterialData));
 
-				commandList->SetGraphicsRootDescriptorTable(3, cbHandlePS);
+				commandList[0]->SetGraphicsRootDescriptorTable(3, cbHandlePS);
 
 				// Set the SRV descriptor handle for this material's textures
 				// Note: This assumes that descriptor table 4 is for textures (as per our root sig)
-				commandList->SetGraphicsRootDescriptorTable(4, currentMaterial->GetFinalGPUHandleForTextures());
+				commandList[0]->SetGraphicsRootDescriptorTable(4, currentMaterial->GetFinalGPUHandleForTextures());
 			}
 
 			// Also track current mesh
@@ -807,8 +841,8 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 				D3D12_INDEX_BUFFER_VIEW indexBuffView = currentMesh->GetIndexBufferView();
 				D3D12_VERTEX_BUFFER_VIEW vertexBuffView = currentMesh->GetVertexBufferView();
 				// Set them using IASetVertexBuffers() and IASetIndexBuffer()
-				commandList->IASetIndexBuffer(&indexBuffView);
-				commandList->IASetVertexBuffers(0, 1, &vertexBuffView);
+				commandList[0]->IASetIndexBuffer(&indexBuffView);
+				commandList[0]->IASetVertexBuffers(0, 1, &vertexBuffView);
 			}
 
 			// Per Object Data (Only Vertex right now)
@@ -818,20 +852,20 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 				vsData.worldInvTranspose = entityPtr->GetTransform()->GetWorldInverseTransposeMatrix();
 				D3D12_GPU_DESCRIPTOR_HANDLE handle =
 					d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsData), sizeof(VSPerObjectData));
-				commandList->SetGraphicsRootDescriptorTable(1, handle);
+				commandList[0]->SetGraphicsRootDescriptorTable(1, handle);
 			}
 
 			// Call DrawIndexedInstanced() using the index count of this entity’s mesh
-			commandList->DrawIndexedInstanced(currentMesh->GetIndexCount(), 1, 0, 0, 0);
+			commandList[0]->DrawIndexedInstanced(currentMesh->GetIndexCount(), 1, 0, 0, 0);
 		}
 	}
 
 	//// Render the Sky
 	{
 		// Set overall pipeline state
-		Graphics::commandList->SetPipelineState(Assets::GetInstance().GetPiplineState(L"PipelineStates/Sky").Get());
+		Graphics::commandList[0]->SetPipelineState(Assets::GetInstance().GetPiplineState(L"PipelineStates/Sky").Get());
 		// Root sig (must happen before root descriptor table)
-		Graphics::commandList->SetGraphicsRootSignature(Assets::GetInstance().GetRootSig(L"RootSigs/Sky").Get());
+		Graphics::commandList[0]->SetGraphicsRootSignature(Assets::GetInstance().GetRootSig(L"RootSigs/Sky").Get());
 		// Vertex Data
 		{
 			// Use FillNextConstantBufferAndGetGPUDescriptorHandle() 
@@ -839,7 +873,7 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 			D3D12_GPU_DESCRIPTOR_HANDLE handle =
 				d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsPerFrameData), sizeof(VSPerFrameData));
 			// Use commandList->SetGraphicsRootDescriptorTable(0, handle) to set the handle from the previous line.
-			Graphics::commandList->SetGraphicsRootDescriptorTable(0, handle);
+			Graphics::commandList[0]->SetGraphicsRootDescriptorTable(0, handle);
 		}
 
 		// Pixel Shader
@@ -856,21 +890,21 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 			// Note: This assumes that descriptor table 1 is the
 			//       place to put this particular descriptor.  This
 			//       is based on how we set up our root signature.
-			Graphics::commandList->SetGraphicsRootDescriptorTable(2, cbHandlePS);
+			Graphics::commandList[0]->SetGraphicsRootDescriptorTable(2, cbHandlePS);
 		}
 		// Set the SRV descriptor handle for this sky's textures
 		// Note: This assumes that descriptor table 4 is for textures (as per our root sig)
-		Graphics::commandList->SetGraphicsRootDescriptorTable(4, scene->GetSky()->GetTextureGPUHandle());
+		Graphics::commandList[0]->SetGraphicsRootDescriptorTable(4, scene->GetSky()->GetTextureGPUHandle());
 
 		// Grab the vertex buffer view and index buffer view from this entity’s mesh
 		D3D12_INDEX_BUFFER_VIEW indexBuffView = scene->GetSky()->GetMesh()->GetIndexBufferView();
 		D3D12_VERTEX_BUFFER_VIEW vertexBuffView = scene->GetSky()->GetMesh()->GetVertexBufferView();
 		// Set them using IASetVertexBuffers() and IASetIndexBuffer()
-		Graphics::commandList->IASetIndexBuffer(&indexBuffView);
-		Graphics::commandList->IASetVertexBuffers(0, 1, &vertexBuffView);
+		Graphics::commandList[0]->IASetIndexBuffer(&indexBuffView);
+		Graphics::commandList[0]->IASetVertexBuffers(0, 1, &vertexBuffView);
 
 		// Call DrawIndexedInstanced() using the index count of this entity’s mesh
-		Graphics::commandList->DrawIndexedInstanced(scene->GetSky()->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
+		Graphics::commandList[0]->DrawIndexedInstanced(scene->GetSky()->GetMesh()->GetIndexCount(), 1, 0, 0, 0);
 	}
 
 
@@ -881,17 +915,17 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 		if (currentPipelineState != emitterPtr->GetPipelineState())
 		{
 			currentPipelineState = emitterPtr->GetPipelineState();
-			commandList->SetPipelineState(currentPipelineState.Get());
-			commandList->SetGraphicsRootSignature(Assets::GetInstance().GetRootSig(L"RootSigs/Particle").Get());
-			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			commandList[0]->SetPipelineState(currentPipelineState.Get());
+			commandList[0]->SetGraphicsRootSignature(Assets::GetInstance().GetRootSig(L"RootSigs/Particle").Get());
+			commandList[0]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			// Input Per Frame Data
-			commandList->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
-			commandList->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
+			commandList[0]->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
+			commandList[0]->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
 		}
 		// Set the SRV descriptor handle for this emitter's texture
 		// Note: This assumes that descriptor table 4 is for textures (as per our root sig)
-		Graphics::commandList->SetGraphicsRootDescriptorTable(4, emitterPtr->GetTextureGPUHandle());
+		Graphics::commandList[0]->SetGraphicsRootDescriptorTable(4, emitterPtr->GetTextureGPUHandle());
 
 		// Emitter Specific Per Frame Data
 		VSEmitterPerFrameData vsEmitterData = {};
@@ -904,33 +938,25 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 
 		D3D12_GPU_DESCRIPTOR_HANDLE handle =
 			d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsEmitterData), sizeof(VSEmitterPerFrameData));
-		commandList->SetGraphicsRootDescriptorTable(1, handle);
+		commandList[0]->SetGraphicsRootDescriptorTable(1, handle);
 
 		// Send Particle Data to GPU
-		emitterPtr->CopyParticlesToGPU(commandList, Device);
+		emitterPtr->CopyParticlesToGPU(commandList[0], Device);
 
 		// Set the SRV descriptor handle for these Particles
 		// Note: This assumes that descriptor table 5 is for particles (as per our root sig)
-		commandList->SetGraphicsRootDescriptorTable(5, emitterPtr->GetGPUHandle());
+		commandList[0]->SetGraphicsRootDescriptorTable(5, emitterPtr->GetGPUHandle());
 
 		// Set Vertex and Index Buffers
 		D3D12_INDEX_BUFFER_VIEW indexBuffView = emitterPtr->GetIndexBufferView();
-		Graphics::commandList->IASetVertexBuffers(0, 1, NULL);
-		Graphics::commandList->IASetIndexBuffer(&indexBuffView);
+		Graphics::commandList[0]->IASetVertexBuffers(0, 1, NULL);
+		Graphics::commandList[0]->IASetIndexBuffer(&indexBuffView);
 
 		// Draw
-		Graphics::commandList->DrawIndexedInstanced(emitterPtr->GetNumLivingParticles() * 6, 1, 0, 0, 0);
+		Graphics::commandList[0]->DrawIndexedInstanced(emitterPtr->GetNumLivingParticles() * 6, 1, 0, 0, 0);
 	}
 	
 
-	//// ImGui
-	{
-		ImGui::Render();
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> imGuiHeap = d3d12Helper.GetImGuiHeap();
-		commandList->SetDescriptorHeaps(1, imGuiHeap.GetAddressOf());
-		ImDrawData* drawData = ImGui::GetDrawData();
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), Graphics::commandList.Get());
-	}
 
 	// Perform Frame End operations
 	FrameEnd();

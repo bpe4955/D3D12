@@ -2,6 +2,7 @@
 
 #include <DirectXMath.h>
 #include <vector>
+#include <functional>
 
 class Transform
 {
@@ -28,6 +29,7 @@ public:
 	void SetScale(float x, float y, float z);
 	void SetScale(DirectX::XMFLOAT3 scale);
 	void SetTransformsFromMatrix(DirectX::XMFLOAT4X4 worldMatrix);
+	void SetDirtyFunction(std::function<void()> funcPtr);
 
 	// Getters
 	DirectX::XMFLOAT3 GetPosition();
@@ -79,5 +81,8 @@ private:
 	Transform* parent;
 	std::vector<Transform*> children;
 	void MarkChildTransformsDirty();
+
+	// Delegates and Callbacks
+	std::function<void()> dirtyCallBack;
 };
 

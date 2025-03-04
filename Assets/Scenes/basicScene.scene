@@ -1,6 +1,11 @@
 {
     "name"      : "basicScene",
     "sky"       : "Skies/planet",
+    "bounds" :
+    {
+        "min" : [-32, -16, -16],
+        "max" : [32, 16, 16]     
+    },
     "cameras"   :
     [
         {
@@ -24,6 +29,7 @@
     "entities"  : 
     [
         {
+            "name"      : "sphere",
             "mesh"      : "Basic Meshes/sphere",
             "material"  : "Materials/cobblestone",
             "transform" :
@@ -32,6 +38,7 @@
             }
         },
         {
+            "name"      : "cube",
             "mesh"      : "Basic Meshes/cube",
             "material"  : "Materials/bronze",
             "transform" :
@@ -40,6 +47,7 @@
             }
         },
         {
+            "name"      : "helix",
             "mesh"      : "Basic Meshes/helix",
             "material"  : "Materials/scratched",
             "transform" :
@@ -48,6 +56,7 @@
             }
         },
         {
+            "name"      : "cylinder",
             "mesh"      : "Basic Meshes/cylinder",
             "material"  : "Materials/cobblestone",
             "transform" :
@@ -56,6 +65,7 @@
             }
         },
         {
+            "name"      : "torus",
             "mesh"      : "Basic Meshes/torus",
             "material"  : "Materials/bronze",
             "transform" :
@@ -64,6 +74,7 @@
             }
         },
         {
+            "name"      : "ground",
             "mesh"      : "Basic Meshes/cube",
             "material"  : "Materials/cobblestoneBasic",
             "transform" :
@@ -73,6 +84,7 @@
             }
         },
         {
+            "name"      : "childSphere",
             "mesh"      : "Basic Meshes/sphere",
             "material"  : "Materials/cushionBasic",
             "transform" :
@@ -86,6 +98,7 @@
     "emitters"  : 
     [
         {
+            "name"                  : "smoke",
             "maxParticles"          : 500,
             "particlesPerSecond"    : 10,
             "lifeTime"              : 15,
@@ -106,6 +119,7 @@
             "endColor"              :   [0.5,0.5,0.5,0.5]
         },
         {
+            "name"                  : "rain",
             "maxParticles"          : 500,
             "particlesPerSecond"    : 150,
             "lifeTime"              : 2.5,

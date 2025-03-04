@@ -12,7 +12,8 @@ Transform::Transform() :
 	forward(0, 0, 1),
 	matricesDirty(false),
 	vectorsDirty(false),
-	parent(nullptr)
+	parent(nullptr),
+	dirtyCallBack(nullptr)
 {
 	// Start with an identity matrix and basic transform data
 	XMStoreFloat4x4(&worldMatrix, XMMatrixIdentity());
@@ -75,6 +76,8 @@ void Transform::Scale(float uniformScale)
 	scale.y *= uniformScale;
 	scale.z *= uniformScale;
 	matricesDirty = true;
+	if (dirtyCallBack)
+		dirtyCallBack();
 }
 void Transform::Scale(float x, float y, float z)
 {
@@ -82,6 +85,8 @@ void Transform::Scale(float x, float y, float z)
 	scale.y *= y;
 	scale.z *= z;
 	matricesDirty = true;
+	if (dirtyCallBack)
+		dirtyCallBack();
 }
 void Transform::Scale(DirectX::XMFLOAT3 scale)
 {
@@ -89,6 +94,8 @@ void Transform::Scale(DirectX::XMFLOAT3 scale)
 	this->scale.y *= scale.y;
 	this->scale.z *= scale.z;
 	matricesDirty = true;
+	if (dirtyCallBack)
+		dirtyCallBack();
 }
 // Setters
 void Transform::SetPosition(float x, float y, float z)
@@ -97,11 +104,15 @@ void Transform::SetPosition(float x, float y, float z)
 	position.y = y;
 	position.z = z;
 	matricesDirty = true;
+	if (dirtyCallBack)
+		dirtyCallBack();
 }
 void Transform::SetPosition(DirectX::XMFLOAT3 position)
 {
 	this->position = position;
 	matricesDirty = true;
+	if (dirtyCallBack)
+		dirtyCallBack();
 }
 void Transform::SetRotation(float p, float y, float r)
 {
@@ -123,6 +134,8 @@ void Transform::SetScale(float uniformScale)
 	scale.y = uniformScale;
 	scale.z = uniformScale;
 	matricesDirty = true;
+	if (dirtyCallBack)
+		dirtyCallBack();
 }
 void Transform::SetScale(float x, float y, float z)
 {
@@ -130,15 +143,20 @@ void Transform::SetScale(float x, float y, float z)
 	scale.y = y;
 	scale.z = z;
 	matricesDirty = true;
+	if (dirtyCallBack)
+		dirtyCallBack();
 }
 void Transform::SetScale(DirectX::XMFLOAT3 scale)
 {
 	this->scale = scale;
 	matricesDirty = true;
+	if (dirtyCallBack)
+		dirtyCallBack();
 }
 void Transform::SetTransformsFromMatrix(DirectX::XMFLOAT4X4 worldMatrix)
 {
 }
+void Transform::SetDirtyFunction(std::function<void()> funcPtr) { dirtyCallBack = funcPtr; }
 // Getters
 DirectX::XMFLOAT3 Transform::GetPosition() { return position; }
 DirectX::XMFLOAT3 Transform::GetPitchYawRoll() { return pitchYawRoll; }

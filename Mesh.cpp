@@ -21,7 +21,8 @@
 using namespace DirectX;
 
 // Constructors
-Mesh::Mesh(Vertex* vertices, int _vertexCount, unsigned int* indices, int _indexCount) :
+Mesh::Mesh(Vertex* vertices, int _vertexCount, 
+	unsigned int* indices, int _indexCount) :
 	vertexCount(_vertexCount),
 	indexCount(_indexCount)
 
@@ -62,6 +63,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> Mesh::GetIndexBuffer() { return indexBuff
 D3D12_INDEX_BUFFER_VIEW Mesh::GetIndexBufferView() { return ibView; }
 int Mesh::GetIndexCount() { return indexCount; }
 int Mesh::GetVertexCount() { return vertexCount; }
+AABB Mesh::GetAABB() { return aabb; }
+
+// Setters
+void Mesh::SetAABB(AABB _aabb) { aabb = _aabb; }
 
 void Mesh::CreateBuffers(Vertex* vertices, unsigned int* indices)
 {
@@ -89,6 +94,9 @@ void Mesh::LoadModelAssimp(std::string fileName)
 		std::cerr << "Could not load file " << fileName << ": " << aiGetErrorString() << std::endl;
 		return;
 	}
+
+	aabb.max = DirectX::XMFLOAT3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+	aabb.min = DirectX::XMFLOAT3(FLT_MAX, FLT_MAX, FLT_MAX);
 
 	// Load all meshes into one mesh (assimp separates a model into a mesh for each material)
 	// Ideally, each mesh would be loaded in its own mesh with its own material
@@ -122,6 +130,14 @@ void Mesh::LoadModelAssimp(std::string fileName)
 				v.Position.x = pos.x;
 				v.Position.y = pos.y;
 				v.Position.z = pos.z;
+
+				// AABB
+				aabb.max.x = aabb.max.x > pos.x ? aabb.max.x : pos.x;
+				aabb.max.y = aabb.max.y > pos.y ? aabb.max.y : pos.y;
+				aabb.max.z = aabb.max.z > pos.z ? aabb.max.z : pos.z;
+				aabb.min.x = aabb.min.x < pos.x ? aabb.min.x : pos.x;
+				aabb.min.y = aabb.min.y < pos.y ? aabb.min.y : pos.y;
+				aabb.min.z = aabb.min.z < pos.z ? aabb.min.z : pos.z;
 
 				aiVector3D norm = readMesh->mNormals[i];
 				v.Normal.x = norm.x;

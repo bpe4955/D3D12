@@ -5,6 +5,7 @@
 #include "PathHelpers.h"
 #include "Window.h"
 #include "Assets.h"
+#include "psapi.h"
 
 #include "D3D12Helper.h"
 
@@ -187,6 +188,39 @@ void Game::Update(float deltaTime, float totalTime)
 		}
 		*/
 	}
+	else if (scene->GetName() == "spheres")
+	{
+		// Entities
+		std::vector<std::shared_ptr<Entity>> entities = scene->GetEntities();
+		
+		std::shared_ptr<Mesh> mesh = Assets::GetInstance().GetMesh(L"Basic Meshes/sphere");
+		std::shared_ptr<Material> material = Assets::GetInstance().GetMaterial(L"Materials/cobblestone");
+		
+		if (entities.size() <= 1)
+		{
+			int count = 0;
+			XMFLOAT3 pos = XMFLOAT3();
+			int range = 120;
+			for (int z = -range; z < range; z += 16)
+			{
+				pos.z = (float)z;
+				for (int y = -range; y < range; y += 16)
+				{
+					pos.y = (float)y;
+					for (int x = -range; x < range; x += 16)
+					{
+						count++;
+						pos.x = (float)x;
+						std::string name = "Sphere" + std::to_string(count);
+						std::shared_ptr<Entity> entity = std::make_shared<Entity>(mesh, material, name);
+						entity->GetTransform()->SetPosition(pos);
+
+						scene->AddEntity(entity);
+					}
+				}
+			}
+		}
+	}
 
 	if (Input::KeyPress(VK_TAB))
 	{
@@ -202,12 +236,8 @@ void Game::Update(float deltaTime, float totalTime)
 	scene->GetLights()[0].Position = currentCamera->GetTransform()->GetPosition();
 	scene->GetLights()[0].Direction = MouseDirection();
 
-	// Emitters
-	for (std::shared_ptr<Emitter> emitter : scene->GetEmitters())
-	{
-		emitter->Update(deltaTime, totalTime);
-	}
-
+	// Scene
+	scene->Update(deltaTime, totalTime);
 }
 
 
@@ -279,6 +309,13 @@ void Game::BuildUI()
 		if (fps > 58) { ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Framerate: %f fps", fps); }
 		else if (fps > 30) { ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Framerate: %f fps", fps); }
 		else { ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Framerate: %f fps", fps); }
+		PROCESS_MEMORY_COUNTERS_EX pmc;
+		GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+		//ImGui::Text("Pagefile Usage: %i MB", (int)pmc.PagefileUsage / 125000););
+		ImGui::Text("Virtual Memory: %i MB", (int)pmc.PrivateUsage / 125000);
+		ImGui::Text("Physical Memory: %i MB", (int)pmc.WorkingSetSize / 125000);
+
+
 		ImGui::Text("Frame Count: %d", ImGui::GetFrameCount());
 		ImGui::Text("Window Resolution: %dx%d", Window::Width(), Window::Height());
 		ImGui::Checkbox("ImGui Demo Window Visibility", &showDemoWindow);
@@ -289,9 +326,15 @@ void Game::BuildUI()
 
 		ImGui::TreePop();
 	}
+	if (ImGui::TreeNode("Camera"))
+	{
+		XMFLOAT3 pos = scene->GetCurrentCamera()->GetTransform()->GetPosition();
+		ImGui::Text("Position: %f, %f, %f", pos.x, pos.y, pos.z);
+		ImGui::TreePop();
+	}
 	if (ImGui::TreeNode("Scene"))
 	{
-		const char* items[] = { "Basic", "Peaches Castle", "Click Clock Wood"};
+		const char* items[] = { "Basic", "Spheres", "Peaches Castle", "Click Clock Wood"};
 		static int item_current = 0;
 		if (ImGui::Combo("combo", &item_current, items, IM_ARRAYSIZE(items)))
 		{
@@ -300,8 +343,9 @@ void Game::BuildUI()
 			switch (item_current)
 			{
 			case 0: scene = Assets::GetInstance().LoadScene(L"Scenes/basicScene"); break;
-			case 1: scene = Assets::GetInstance().LoadScene(L"Scenes/peachesCastle"); break;
-			case 2: scene = Assets::GetInstance().LoadScene(L"Scenes/clickClockWood"); break;
+			case 1: scene = Assets::GetInstance().LoadScene(L"Scenes/spheres"); break;
+			case 2: scene = Assets::GetInstance().LoadScene(L"Scenes/peachesCastle"); break;
+			case 3: scene = Assets::GetInstance().LoadScene(L"Scenes/clickClockWood"); break;
 			}
 			currentCameraIndex = 0;
 			scene->GetCurrentCamera()->UpdateProjectionMatrix(Window::AspectRatio());

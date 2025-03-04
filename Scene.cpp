@@ -9,7 +9,9 @@ using json = nlohmann::json;
 using namespace DirectX;
 
 // Constructor / Destructor
-Scene::Scene(std::string _name) : name(_name), opaqueEntitiesOrganized(false) {}
+Scene::Scene(std::string _name, AABB _bounds) 
+	: name(_name), bounds(_bounds),
+	opaqueEntitiesOrganized(false) {}
 Scene::~Scene() {}
 
 // Getters
@@ -21,6 +23,7 @@ std::vector<std::shared_ptr<Camera>>& Scene::GetCameras() { return cameras; }
 std::shared_ptr<Camera> Scene::GetCurrentCamera() { return currentCamera; }
 std::shared_ptr<Sky> Scene::GetSky() { return sky; }
 std::vector<std::shared_ptr<Emitter>>& Scene::GetEmitters() { return emitters; }
+std::shared_ptr<Octree::Node> Scene::GetOctree() { return octree; }
 bool Scene::OpaqueReady() { return opaqueEntitiesOrganized; }
 
 // Setters
@@ -36,7 +39,13 @@ void Scene::SetCurrentCamera(unsigned int cameraIndex)
 void Scene::SetSky(std::shared_ptr<Sky> _sky) { sky = _sky; }
 
 // Modifiers
-void Scene::AddEntity(std::shared_ptr<Entity> entity) { entities.push_back(entity); }
+void Scene::AddEntity(std::shared_ptr<Entity> entity) 
+{
+	opaqueEntitiesOrganized = false;
+	entities.push_back(entity); 
+	if(octree)
+		octree->AddToPending(entity);
+}
 void Scene::AddLight(Light light) { lights.push_back(light); }
 void Scene::AddCamera(std::shared_ptr<Camera> camera) { cameras.push_back(camera); }
 void Scene::AddEmitter(std::shared_ptr<Emitter> emitter) { emitters.push_back(emitter); }
@@ -48,19 +57,29 @@ void Scene::Clear()
 	lights.clear();
 	cameras.clear();
 	entities.clear();
+	octree->Clear();
 
 	currentCamera.reset();
 	sky.reset();
 }
 
-void Scene::InitialSort()
+void Scene::Init()
 {
-	opaqueEntities = entities;
-	std::sort(opaqueEntities.begin(), opaqueEntities.end(), [](const auto& e1, const auto& e2)
-		{
-			// Compare pointers to materials
-			return e1->GetMaterials()[0]->GetPipelineState() < e2->GetMaterials()[0]->GetPipelineState();
-		});
-	opaqueEntitiesOrganized = true;
+	// Build Octree
+	octree = std::make_shared<Octree::Node>(bounds, entities);
+	octree->Build();
+}
+
+
+void Scene::Update(float deltaTime, float totalTime)
+{
+	// Emitters
+	for (std::shared_ptr<Emitter> emitter : emitters)
+	{
+		emitter->Update(deltaTime, totalTime);
+	}
+
+	// Octree
+	octree->Update();
 }
 

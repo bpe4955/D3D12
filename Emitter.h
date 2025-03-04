@@ -2,6 +2,7 @@
 
 #include <d3d12.h>
 #include <memory>
+#include <string>
 
 #include "Transform.h"
 #include "Material.h"
@@ -27,6 +28,7 @@ public:
 		float _lifeTime,
 		D3D12_CPU_DESCRIPTOR_HANDLE texture,
 		bool _isAdditive = true,
+		std::string _name = "NoName",
 		bool _constrainYAxis = false,
 		DirectX::XMFLOAT3 _emitterPosition = DirectX::XMFLOAT3(0, 0, 0),
 		DirectX::XMFLOAT3 _positionRandomRange = DirectX::XMFLOAT3(0, 0, 0),
@@ -98,6 +100,7 @@ private:
 	float timeSinceLastEmit;
 
 	// General
+	std::string name;
 	std::shared_ptr<Transform> transform;
 
 	// Buffer Data

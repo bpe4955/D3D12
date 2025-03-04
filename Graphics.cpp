@@ -14,6 +14,9 @@ extern "C"
 	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1; // AMD
 }
 
+// Helper macro for getting if a number is within a range
+#define within(min, value, max) (value >= min && value <= max)
+
 namespace Graphics
 {
 
@@ -590,6 +593,246 @@ namespace
 			Graphics::currentSwapBuffer = d3d12Helper.SyncSwapChain(Graphics::currentSwapBuffer);
 		}
 	}
+
+	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(std::shared_ptr<Scene> scene);
+	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(std::shared_ptr<Scene> scene)
+	{
+		// NOT WORKING
+		// Example of frustum culling by creating a frustum out of planes and normals
+		// then checking if objects are within those faces
+		// https://learnopengl.com/Guest-Articles/2021/Scene/Frustum-Culling
+		//{
+		//	// Get Frustum (points) to check octree with
+		//	Frustum frustum = scene->GetCurrentCamera()->GetFrustum();
+		//	DirectX::XMFLOAT3* pointsPtr = frustum.points;
+		//	std::vector<DirectX::XMFLOAT3> points;
+		//	points.assign(pointsPtr, pointsPtr + 8);
+
+		//	// Use Octree to get entities to check collision with
+		//	Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
+		//	std::vector<std::shared_ptr<Entity>> entities =
+		//		octant == nullptr ? scene->GetEntities()
+		//		: octant->GetAllEntities();
+
+
+		//	entities = scene->GetEntities();
+		//	// Frustum Culling
+		//	for (int i = entities.size() - 1; i >= 0; i--)
+		//	{
+		//		if (!frustum.Overlaps(entities[i]->GetAABB()))
+		//			entities.erase(entities.begin() + i);
+		//	}
+
+		//	return entities;
+		//}
+		
+		
+		
+		// Example of frustum culling by using the camera's view and projection matrices
+		// instead of creating a Frustum object
+		// https://bruop.github.io/frustum_culling/
+		{
+			/*
+			// Get data to calculate a rough estimation of the frustum
+			DirectX::XMFLOAT3 pos = scene->GetCurrentCamera()->GetTransform()->GetPosition();
+			DirectX::XMFLOAT3 fwd = scene->GetCurrentCamera()->GetTransform()->GetForward();
+			DirectX::XMFLOAT3 right = scene->GetCurrentCamera()->GetTransform()->GetRight();
+			DirectX::XMFLOAT3 up = scene->GetCurrentCamera()->GetTransform()->GetUp();
+			float farClip = scene->GetCurrentCamera()->GetFarClip();
+			float fov = scene->GetCurrentCamera()->GetFieldOfView();
+			float aspectRatio = scene->GetCurrentCamera()->GetAspectRatio();
+			float farHeight = 2 * std::tan(fov / 2) * farClip;
+			float farWidth = farHeight * aspectRatio;
+
+			// Calculate Frustum (points)
+			// https://stackoverflow.com/questions/13665932/calculating-the-viewing-frustum-in-a-3d-space
+			std::vector<DirectX::XMFLOAT3> points;
+			points.push_back(pos); // Cam Position
+			DirectX::XMVECTOR posVec = DirectX::XMLoadFloat3(&pos); 
+
+			DirectX::XMVECTOR fwdVec = DirectX::XMLoadFloat3(&fwd);
+			fwdVec = DirectX::XMVectorScale(fwdVec, farClip);
+			DirectX::XMVECTOR farCenter = DirectX::XMVectorAdd(fwdVec, posVec); // Center of far clip plane
+
+			DirectX::XMVECTOR rightVec = DirectX::XMLoadFloat3(&right);
+			rightVec = DirectX::XMVectorScale(rightVec, farWidth / 2);
+
+			DirectX::XMVECTOR upVec = DirectX::XMLoadFloat3(&up);
+			upVec = DirectX::XMVectorScale(upVec, farHeight / 2);
+
+			DirectX::XMVECTOR farBottomLeft = DirectX::XMVectorSubtract( // Bottom left of far clip plane
+				DirectX::XMVectorSubtract(farCenter, upVec), rightVec );
+			points.push_back({});
+			DirectX::XMStoreFloat3(&points[1], farBottomLeft);
+
+			DirectX::XMVECTOR farTopRight = DirectX::XMVectorAdd( // Top Right of far clip plane
+				DirectX::XMVectorAdd(farCenter, upVec), rightVec);
+			points.push_back({});
+			DirectX::XMStoreFloat3(&points[2], farTopRight);
+
+			// Use Octree to get entities to check collision with
+			Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
+			std::vector<std::shared_ptr<Entity>> entities = 
+				octant == nullptr ? scene->GetEntities() 
+				: octant->GetAllEntities();
+				*/
+
+			// Get Frustum (points) to check octree with
+			Frustum frustum = scene->GetCurrentCamera()->GetFrustum();
+			DirectX::XMFLOAT3* pointsPtr = frustum.points;
+			std::vector<DirectX::XMFLOAT3> points;
+			points.assign(pointsPtr, pointsPtr + 8);
+
+			// Use Octree to get entities to check collision with
+			Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
+			std::vector<std::shared_ptr<Entity>> entities =
+				octant == nullptr ? scene->GetEntities()
+				: octant->GetAllEntities();
+
+			// Frustum culling
+			DirectX::XMFLOAT4X4 proj = scene->GetCurrentCamera()->GetProjection();
+			DirectX::XMMATRIX projMat = DirectX::XMLoadFloat4x4(&proj);
+			DirectX::XMFLOAT4X4 view = scene->GetCurrentCamera()->GetView();
+			DirectX::XMMATRIX viewMat = DirectX::XMLoadFloat4x4(&view);
+			DirectX::XMMATRIX VP = DirectX::XMMatrixMultiply(viewMat, projMat);
+
+			for (int index = (int)entities.size() - 1; index >= 0; index--)
+			{
+				// Use out min max to define four adjacent corners
+				AABB aabb = entities[index]->GetAABB();
+				DirectX::XMFLOAT4 corners[8] = {
+				{aabb.min.x, aabb.min.y, aabb.min.z, 1.0}, // x y z //
+				{aabb.max.x, aabb.min.y, aabb.min.z, 1.0}, // X y z //
+				{aabb.min.x, aabb.max.y, aabb.min.z, 1.0}, // x Y z //
+				{aabb.max.x, aabb.max.y, aabb.min.z, 1.0}, // X Y z
+
+				{aabb.min.x, aabb.min.y, aabb.max.z, 1.0}, // x y Z //
+				{aabb.max.x, aabb.min.y, aabb.max.z, 1.0}, // X y Z
+				{aabb.min.x, aabb.max.y, aabb.max.z, 1.0}, // x Y Z
+				{aabb.max.x, aabb.max.y, aabb.max.z, 1.0}, // X Y Z
+				};
+
+				bool inside = false;
+
+				// Transform corners
+				for (int c = 0; c < 8; c++)
+				{
+					if (inside)
+						break;
+
+					DirectX::XMVECTOR cornerVec = DirectX::XMLoadFloat4(&corners[c]);
+					cornerVec = DirectX::XMVector4Transform(cornerVec, VP);
+					DirectX::XMStoreFloat4(&corners[c], cornerVec);
+
+					// Check vertex against clip space bounds
+					inside = inside ||
+						within(-corners[c].w, corners[c].x, corners[c].w) &&
+						within(-corners[c].w, corners[c].y, corners[c].w) &&
+						within(0.0f, corners[c].z, corners[c].w);
+				}
+				if (inside)
+					continue;
+				else
+					entities.erase(entities.begin() + index);
+
+			}
+
+			return entities;
+		}
+		
+	}
+
+	void DrawEntities(std::vector<std::shared_ptr<Entity>> entities,
+		D3D12_GPU_DESCRIPTOR_HANDLE vsPerFramehandle,
+		D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle,
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList);
+	void DrawEntities(std::vector<std::shared_ptr<Entity>> entities,
+		D3D12_GPU_DESCRIPTOR_HANDLE vsPerFramehandle,
+		D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle,
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList)
+	{
+		// Early exit if no entities to draw
+		if (entities.size() == 0)
+			return;
+
+		// Sort Entities by material
+		std::sort(entities.begin(), entities.end(), [](const auto& e1, const auto& e2)
+			{
+				// Compare pointers to materials
+				return e1->GetMaterials()[0]->GetPipelineState() < e2->GetMaterials()[0]->GetPipelineState();
+			});
+
+		// Draw all of the entities
+		D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> currentPipelineState = 0;
+		std::shared_ptr<Material> currentMaterial = 0;
+		std::shared_ptr<Mesh> currentMesh = 0;
+		for (std::shared_ptr<Entity> entityPtr : entities)
+		{
+			for (int i = 0; i < entityPtr->GetMeshes().size(); i++)
+			{
+				// Track the current material and swap as necessary
+				// (including swapping shaders)
+				if (currentMaterial != entityPtr->GetMaterials()[i])
+				{
+					currentMaterial = entityPtr->GetMaterials()[i];
+					// Swap pipeline state if necessary
+					if (currentPipelineState != currentMaterial->GetPipelineState())
+					{
+						currentPipelineState = currentMaterial->GetPipelineState();
+						cmdList->SetPipelineState(currentPipelineState.Get());
+						cmdList->SetGraphicsRootSignature(currentMaterial->GetRootSignature().Get());
+						cmdList->IASetPrimitiveTopology(currentMaterial->GetTopology());
+
+						// Input Per Frame Data
+						cmdList->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
+						cmdList->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
+					}
+
+					// Set Pixel Shader Data
+					PSPerMaterialData psData = {};
+					psData.colorTint = currentMaterial->GetColorTint();
+					if (currentMaterial->GetRoughness() != -1) psData.colorTint.w = currentMaterial->GetRoughness(); // Store roughness in the alpha of colorTint
+					psData.uvScale = currentMaterial->GetUVScale();
+					psData.uvOffset = currentMaterial->GetUVOffset();
+					D3D12_GPU_DESCRIPTOR_HANDLE cbHandlePS = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
+						(void*)(&psData), sizeof(PSPerMaterialData));
+
+					cmdList->SetGraphicsRootDescriptorTable(3, cbHandlePS);
+
+					// Set the SRV descriptor handle for this material's textures
+					// Note: This assumes that descriptor table 4 is for textures (as per our root sig)
+					cmdList->SetGraphicsRootDescriptorTable(4, currentMaterial->GetFinalGPUHandleForTextures());
+				}
+
+				// Also track current mesh
+				if (currentMesh != entityPtr->GetMeshes()[i])
+				{
+					currentMesh = entityPtr->GetMeshes()[i];
+
+					// Grab the vertex buffer view and index buffer view from this entity’s mesh
+					D3D12_INDEX_BUFFER_VIEW indexBuffView = currentMesh->GetIndexBufferView();
+					D3D12_VERTEX_BUFFER_VIEW vertexBuffView = currentMesh->GetVertexBufferView();
+					// Set them using IASetVertexBuffers() and IASetIndexBuffer()
+					cmdList->IASetIndexBuffer(&indexBuffView);
+					cmdList->IASetVertexBuffers(0, 1, &vertexBuffView);
+				}
+
+				// Per Object Data (Only Vertex right now)
+				{
+					VSPerObjectData vsData = {};
+					vsData.world = entityPtr->GetTransform()->GetWorldMatrix();
+					vsData.worldInvTranspose = entityPtr->GetTransform()->GetWorldInverseTransposeMatrix();
+					D3D12_GPU_DESCRIPTOR_HANDLE handle =
+						d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsData), sizeof(VSPerObjectData));
+					cmdList->SetGraphicsRootDescriptorTable(1, handle);
+				}
+
+				// Call DrawIndexedInstanced() using the index count of this entity’s mesh
+				cmdList->DrawIndexedInstanced(currentMesh->GetIndexCount(), 1, 0, 0, 0);
+			}
+		}
+	}
 }
 
 // --------------------------------------------------------
@@ -766,6 +1009,9 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
 
 
+	// Get the sorted renderable list
+	std::vector<std::shared_ptr<Entity>> toDraw = GetVisibleEntities(scene);
+
 	// Collect all per-frame data and copy to GPU
 	// -- VS
 	std::shared_ptr<Camera> camera = scene->GetCurrentCamera();
@@ -784,86 +1030,17 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 	memcpy(psPerFrameData.lights, &scene->GetLights()[0], sizeof(Light) * MAX_LIGHTS);
 	D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
 		(void*)(&psPerFrameData), sizeof(PSPerFrameData));
-	
 
-	// Get the sorted renderable list
-	if (!scene->OpaqueReady()) { scene->InitialSort(); }
-	std::vector<std::shared_ptr<Entity>> toDraw(scene->GetOpaqueEntities());
+	// Render Entities
+	DrawEntities(toDraw, vsPerFramehandle, psPerFrameHandle,
+		commandList[0]);
 
-	// Draw all of the entities
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> currentPipelineState = 0;
-	std::shared_ptr<Material> currentMaterial = 0;
-	std::shared_ptr<Mesh> currentMesh = 0;
-	for (std::shared_ptr<Entity> entityPtr : toDraw)
-	{
-		for (int i = 0; i < entityPtr->GetMeshes().size(); i++)
-		{
-			// Track the current material and swap as necessary
-			// (including swapping shaders)
-			if (currentMaterial != entityPtr->GetMaterials()[i])
-			{
-				currentMaterial = entityPtr->GetMaterials()[i];
-				// Swap pipeline state if necessary
-				if (currentPipelineState != currentMaterial->GetPipelineState())
-				{
-					currentPipelineState = currentMaterial->GetPipelineState();
-					commandList[0]->SetPipelineState(currentPipelineState.Get());
-					commandList[0]->SetGraphicsRootSignature(currentMaterial->GetRootSignature().Get());
-					commandList[0]->IASetPrimitiveTopology(currentMaterial->GetTopology());
-
-					// Input Per Frame Data
-					commandList[0]->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
-					commandList[0]->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
-				}
-
-				// Set Pixel Shader Data
-				PSPerMaterialData psData = {};
-				psData.colorTint = currentMaterial->GetColorTint();
-				if (currentMaterial->GetRoughness() != -1) psData.colorTint.w = currentMaterial->GetRoughness(); // Store roughness in the alpha of colorTint
-				psData.uvScale = currentMaterial->GetUVScale();
-				psData.uvOffset = currentMaterial->GetUVOffset();
-				D3D12_GPU_DESCRIPTOR_HANDLE cbHandlePS = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
-					(void*)(&psData), sizeof(PSPerMaterialData));
-
-				commandList[0]->SetGraphicsRootDescriptorTable(3, cbHandlePS);
-
-				// Set the SRV descriptor handle for this material's textures
-				// Note: This assumes that descriptor table 4 is for textures (as per our root sig)
-				commandList[0]->SetGraphicsRootDescriptorTable(4, currentMaterial->GetFinalGPUHandleForTextures());
-			}
-
-			// Also track current mesh
-			if (currentMesh != entityPtr->GetMeshes()[i])
-			{
-				currentMesh = entityPtr->GetMeshes()[i];
-
-				// Grab the vertex buffer view and index buffer view from this entity’s mesh
-				D3D12_INDEX_BUFFER_VIEW indexBuffView = currentMesh->GetIndexBufferView();
-				D3D12_VERTEX_BUFFER_VIEW vertexBuffView = currentMesh->GetVertexBufferView();
-				// Set them using IASetVertexBuffers() and IASetIndexBuffer()
-				commandList[0]->IASetIndexBuffer(&indexBuffView);
-				commandList[0]->IASetVertexBuffers(0, 1, &vertexBuffView);
-			}
-
-			// Per Object Data (Only Vertex right now)
-			{
-				VSPerObjectData vsData = {};
-				vsData.world = entityPtr->GetTransform()->GetWorldMatrix();
-				vsData.worldInvTranspose = entityPtr->GetTransform()->GetWorldInverseTransposeMatrix();
-				D3D12_GPU_DESCRIPTOR_HANDLE handle =
-					d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsData), sizeof(VSPerObjectData));
-				commandList[0]->SetGraphicsRootDescriptorTable(1, handle);
-			}
-
-			// Call DrawIndexedInstanced() using the index count of this entity’s mesh
-			commandList[0]->DrawIndexedInstanced(currentMesh->GetIndexCount(), 1, 0, 0, 0);
-		}
-	}
 
 	//// Render the Sky
 	{
 		// Set overall pipeline state
 		Graphics::commandList[0]->SetPipelineState(Assets::GetInstance().GetPiplineState(L"PipelineStates/Sky").Get());
+		commandList[0]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		// Root sig (must happen before root descriptor table)
 		Graphics::commandList[0]->SetGraphicsRootSignature(Assets::GetInstance().GetRootSig(L"RootSigs/Sky").Get());
 		// Vertex Data
@@ -909,6 +1086,7 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 
 
 	//// Render Particles
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> currentPipelineState = 0;
 	for (std::shared_ptr<Emitter> emitterPtr : scene->GetEmitters())
 	{
 		// Different Pipeline Data

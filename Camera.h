@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "Transform.h"
+#include "Collision.h"
 #include "nlohmann/json.hpp"
 
 
@@ -41,6 +42,7 @@ public:
 	void Update(float dt);
 	void UpdateViewMatrix();
 	void UpdateProjectionMatrix(float aspectRatio);
+	void UpdateFrustum();
 
 	// Getters
 	DirectX::XMFLOAT4X4 GetView();
@@ -69,7 +71,7 @@ public:
 	CameraProjectionType GetProjectionType();
 	void SetProjectionType(CameraProjectionType type);
 
-	static std::shared_ptr<Camera> Parse(nlohmann::json jsonCamera);
+	Frustum GetFrustum();
 
 private:
 	// Camera matrices
@@ -89,5 +91,7 @@ private:
 	bool dirtyView;
 
 	CameraProjectionType projectionType;
+
+	Frustum frustum;
 };
 

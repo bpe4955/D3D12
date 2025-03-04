@@ -3,9 +3,12 @@
 #include <d3d12.h>
 #include "Vertex.h"
 #include "PathHelpers.h"
+#include "Collision.h"
 #include <string>
 
 #pragma comment(lib, "assimp-vc143-mtd.lib")
+
+
 
 class Mesh
 {
@@ -46,6 +49,16 @@ public:
 	/// <returns>The number of vertices this mesh contains</returns>
 	int GetVertexCount();
 	/// <summary>
+	/// Returns the Axis-Aligned Bounding Box of this mesh
+	/// </summary>
+	/// <returns>The Axis-Aligned Bounding Box of this mesh</returns>
+	AABB GetAABB();
+	/// <summary>
+	/// Set the mesh's AABB.
+	/// </summary>
+	/// <param name="_aabb">New Axis-Aligned Bounding Box</param>
+	void SetAABB(AABB _aabb);
+	/// <summary>
 	/// Activates the buffers and draws the correct number of indices
 	/// </summary>
 	//void Draw();
@@ -57,6 +70,7 @@ private:
 	int indexCount;
 	D3D12_VERTEX_BUFFER_VIEW vbView;
 	D3D12_INDEX_BUFFER_VIEW ibView;
+	AABB aabb;
 
 };
 

@@ -1469,8 +1469,23 @@ std::shared_ptr<Scene> Assets::LoadScene(std::wstring path)
 		name = sceneJson["name"].get<std::string>();
 	}
 
+	// Check for bounds
+	AABB bounds = {};
+	bounds.min = DirectX::XMFLOAT3(-128, -128, -128);
+	bounds.max = DirectX::XMFLOAT3(128, 128, 128);
+	if (sceneJson.contains("bounds"))
+	{
+		bounds.min.x = sceneJson["bounds"]["min"][0].get<float>();
+		bounds.min.y = sceneJson["bounds"]["min"][1].get<float>();
+		bounds.min.z = sceneJson["bounds"]["min"][2].get<float>();
+
+		bounds.max.x = sceneJson["bounds"]["max"][0].get<float>();
+		bounds.max.y = sceneJson["bounds"]["max"][1].get<float>();
+		bounds.max.z = sceneJson["bounds"]["max"][2].get<float>();
+	}
+
 	// Create the scene
-	std::shared_ptr<Scene> scene = std::make_shared<Scene>(name);
+	std::shared_ptr<Scene> scene = std::make_shared<Scene>(name, bounds);
 
 
 	// Check for cameras
@@ -1530,7 +1545,7 @@ std::shared_ptr<Scene> Assets::LoadScene(std::wstring path)
 		}
 	}
 
-	scene->InitialSort();
+	scene->Init();
 
 	return scene;
 }
@@ -1543,7 +1558,7 @@ std::shared_ptr<Camera> Assets::ParseCamera(nlohmann::json jsonCamera)
 	float lookSpeed = 0.01f;
 	float fov = DirectX::XM_PIDIV2;
 	float nearClip = 0.01f;
-	float farClip = 1000.0f;
+	float farClip = 200.0f;
 	DirectX::XMFLOAT3 pos = { 0, 0, -5 };
 	DirectX::XMFLOAT3 rot = { 0, 0, 0 };
 
@@ -1625,6 +1640,12 @@ std::shared_ptr<Entity> Assets::ParseEntity(nlohmann::json jsonEntity)
 	std::vector<std::shared_ptr<Mesh>> meshes;
 	std::vector<std::shared_ptr<Material>> materials;
 
+	std::string name = "NoName";
+	if (jsonEntity.contains("name"))
+	{
+		name = jsonEntity["name"].get<std::string>();
+	}
+
 	if (jsonEntity.contains("material"))
 	{
 		materials.push_back(GetMaterial(NarrowToWide(jsonEntity["material"].get<std::string>())));
@@ -1654,7 +1675,7 @@ std::shared_ptr<Entity> Assets::ParseEntity(nlohmann::json jsonEntity)
 		else if (std::filesystem::exists(filePathDAE)) 
 		{ ParseComplexMesh(filePathDAE, meshes, materials, pipelineState, rootsignature); }
 	}
-	entity = std::make_shared<Entity>(meshes, materials);
+	entity = std::make_shared<Entity>(meshes, materials, name);
 
 	// Early out if transform is missing
 	if (!jsonEntity.contains("transform")) return entity;
@@ -1712,6 +1733,10 @@ std::shared_ptr<Emitter> Assets::ParseEmitter(nlohmann::json jsonEmitter)
 			if (input == "ZERO" || input == "FALSE" || input == "0")
 				isAdditive = false;
 		}
+
+		std::string name = "NoName";
+		if (jsonEmitter.contains("name"))
+			name = jsonEmitter["name"].get<std::string>();
 
 		std::wstring textureName = NarrowToWide(jsonEmitter["texture"].get<std::string>());
 		D3D12_CPU_DESCRIPTOR_HANDLE texture = GetTexture(textureName);
@@ -1910,6 +1935,11 @@ void Assets::ParseComplexMesh(std::wstring path,
 		return;
 	}
 
+	// Combined AABB of all meshes
+	AABB aabb;
+	aabb.max = DirectX::XMFLOAT3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+	aabb.min = DirectX::XMFLOAT3(FLT_MAX, FLT_MAX, FLT_MAX);
+
 	// Load each mesh in its own mesh with its own material
 	for (size_t meshIndex = 0; meshIndex < scene->mNumMeshes; meshIndex++)
 	{
@@ -1981,6 +2011,14 @@ void Assets::ParseComplexMesh(std::wstring path,
 				v.Position.y = pos.y;
 				v.Position.z = pos.z;
 
+				// AABB
+				aabb.max.x = aabb.max.x > pos.x ? aabb.max.x : pos.x;
+				aabb.max.y = aabb.max.y > pos.y ? aabb.max.y : pos.y;
+				aabb.max.z = aabb.max.z > pos.z ? aabb.max.z : pos.z;
+				aabb.min.x = aabb.min.x < pos.x ? aabb.min.x : pos.x;
+				aabb.min.y = aabb.min.y < pos.y ? aabb.min.y : pos.y;
+				aabb.min.z = aabb.min.z < pos.z ? aabb.min.z : pos.z;
+
 				aiVector3D norm = readMesh->mNormals[i];
 				v.Normal.x = norm.x;
 				v.Normal.y = norm.y;
@@ -2019,6 +2057,8 @@ void Assets::ParseComplexMesh(std::wstring path,
 		meshes.push_back(std::make_shared<Mesh>(
 			&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size()));
 	}
+	// Give the first mesh the combined AABB
+	meshes[0]->SetAABB(aabb);
 
 	aiReleaseImport(scene);
 }

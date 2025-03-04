@@ -6,6 +6,7 @@
 #include "Entity.h"
 #include "Sky.h"
 #include "Emitter.h"
+#include "Octree.h"
 
 #include <fstream>
 #include "nlohmann/json.hpp"
@@ -13,7 +14,7 @@
 class Scene
 {
 public:
-	Scene(std::string _name);
+	Scene(std::string _name, AABB _bounds);
 	~Scene();
 
 
@@ -26,6 +27,7 @@ public:
 	std::shared_ptr<Camera> GetCurrentCamera();
 	std::shared_ptr<Sky> GetSky();
 	std::vector<std::shared_ptr<Emitter>>& GetEmitters();
+	std::shared_ptr<Octree::Node> GetOctree();
 	bool OpaqueReady();
 
 	// Setters
@@ -42,13 +44,14 @@ public:
 
 	// Functions
 	void Clear();
-	void InitialSort();
+	void Init();
+	void Update(float deltaTime, float totalTime);
 
 private:
 	std::string name;
 
 	// Vectors of various scene elements
-	std::vector<std::shared_ptr<Entity>> entities;
+	std::vector<std::shared_ptr<Entity>> entities; // Could also create a map / trie for specific entities
 	std::vector<Light> lights;
 	std::vector<std::shared_ptr<Camera>> cameras;
 	std::vector<std::shared_ptr<Emitter>> emitters;
@@ -58,6 +61,8 @@ private:
 	std::shared_ptr<Sky> sky;
 
 	// For drawing
+	AABB bounds;
+	std::shared_ptr<Octree::Node> octree;
 	bool opaqueEntitiesOrganized;
 	std::vector<std::shared_ptr<Entity>> opaqueEntities;
 };

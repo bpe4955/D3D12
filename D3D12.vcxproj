@@ -188,6 +188,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Octree.cpp" />
     <ClCompile Include="PathHelpers.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Sky.cpp" />
@@ -198,6 +199,7 @@
     <ClInclude Include="Assets.h" />
     <ClInclude Include="BufferStructs.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="Collision.h" />
     <ClInclude Include="D3D12Helper.h" />
     <ClInclude Include="Emitter.h" />
     <ClInclude Include="Entity.h" />
@@ -214,6 +216,7 @@
     <ClInclude Include="Input.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Octree.h" />
     <ClInclude Include="PathHelpers.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Sky.h" />

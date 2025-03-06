@@ -143,6 +143,43 @@ std::vector<std::shared_ptr<Entity>> Octree::Node::GetAllEntities()
 
     return final;
 }
+std::vector<std::shared_ptr<Entity>> Octree::Node::GetRelevantEntities(Frustum& frustum)
+{
+    std::vector<std::shared_ptr<Entity>> final;
+
+    bool within = true;
+    for (int i = 0; i<6; i++)
+    {
+        if (!this->bounds.IntersectsPlane(frustum.normals[i]))
+        {
+            within = false;
+            break;
+        }
+    }
+    if (within)
+    {
+        // Get current node entities
+        if (entities.size() != 0)
+            final.insert(final.end(), entities.begin(), entities.end());
+
+        // Get child node entities
+        if (HasChildren())
+        {
+            for (unsigned char flags = activeOctants, i = 0;
+                flags > 0;
+                flags >>= 1, i++)
+            {
+                if (flags & (1 << 0) && children[i] != nullptr) // Child exists
+                {
+                    std::vector<std::shared_ptr<Entity>> child = children[i]->GetRelevantEntities(frustum);
+                    final.insert(final.end(), child.begin(), child.end());
+                }
+            }
+        }
+    }
+
+    return final;
+}
 Octree::Node** Octree::Node::GetChildren() { return children; }
 unsigned char Octree::Node::GetActiveOctants() { return activeOctants; }
 
@@ -451,6 +488,7 @@ bool Octree::Node::Insert(std::shared_ptr<Entity> _entity)
                 children[i] = new Node(octantBounds[i], { _entity }, this);
                 children[i]->Build();
                 activeOctants ^= (1 << i);
+                return true;
             }
     }
 

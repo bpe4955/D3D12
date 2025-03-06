@@ -49,6 +49,7 @@ namespace Octree
 		AABB GetBounds();
 		std::vector<std::shared_ptr<Entity>> GetEntities();
 		std::vector<std::shared_ptr<Entity>> GetAllEntities();
+		std::vector<std::shared_ptr<Entity>> GetRelevantEntities(Frustum& frustum);
 		Octree::Node** GetChildren();
 		unsigned char GetActiveOctants();
 

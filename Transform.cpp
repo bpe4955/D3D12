@@ -384,6 +384,7 @@ void Transform::MarkChildTransformsDirty()
 	{
 		child->matricesDirty = true;
 		child->vectorsDirty = true;
+		child->dirtyCallBack();
 		child->MarkChildTransformsDirty();
 	}
 }

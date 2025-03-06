@@ -5,7 +5,7 @@
 #include "Material.h"
 #include <string>
 
-class Entity : public std::enable_shared_from_this<Entity>
+class Entity
 {
 public:
 	Entity(std::shared_ptr<Mesh> _mesh,

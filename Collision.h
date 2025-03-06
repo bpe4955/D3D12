@@ -12,6 +12,31 @@ inline float Dot(DirectX::XMFLOAT3 vec1, DirectX::XMFLOAT3 vec2)
 
 	return ans;
 }
+inline float Dot(DirectX::XMFLOAT4 vec1, DirectX::XMFLOAT3 vec2)
+{
+	DirectX::XMFLOAT3 temp = DirectX::XMFLOAT3(vec1.x, vec1.y, vec1.z);
+	DirectX::XMVECTOR a = DirectX::XMLoadFloat3(&temp);
+	DirectX::XMVECTOR b = DirectX::XMLoadFloat3(&vec2);
+
+	float ans;
+	DirectX::XMStoreFloat(&ans,
+		DirectX::XMVector3Dot(a, b));
+
+	return ans;
+}
+inline float CalcD(DirectX::XMFLOAT4 vec1, DirectX::XMFLOAT3 vec2)
+{
+	return
+		vec1.x * vec2.x +
+		vec1.y * vec2.y +
+		vec1.z * vec2.z;
+}
+
+struct Ray
+{
+	DirectX::XMFLOAT3 origin;
+	DirectX::XMFLOAT3 direction;
+};
 
 struct AABB
 {
@@ -42,15 +67,68 @@ struct AABB
 
 	}
 
-	bool Overlaps(AABB other)
+	// https://gist.github.com/DomNomNom/46bb1ce47f68d255fd5d
+	bool Intersects(Ray other)
 	{
-		return
-			this->min.x <= other.max.x &&
-			this->max.x >= other.min.x &&
-			this->min.y <= other.max.y &&
-			this->max.y >= other.min.y &&
-			this->min.z <= other.max.z &&
-			this->max.z >= other.min.z;
+		DirectX::XMFLOAT3 tMin = DirectX::XMFLOAT3(
+			(this->min.x - other.origin.x) / other.direction.x,
+			(this->min.y - other.origin.y) / other.direction.y,
+			(this->min.z - other.origin.z) / other.direction.z
+		);
+		DirectX::XMFLOAT3 tMax = DirectX::XMFLOAT3(
+			(this->max.x - other.origin.x) / other.direction.x,
+			(this->max.y - other.origin.y) / other.direction.y,
+			(this->max.z - other.origin.z) / other.direction.z
+		);
+		DirectX::XMFLOAT3 t1 = DirectX::XMFLOAT3();
+		t1.x = (((tMin.x) < (tMax.x)) ? (tMin.x) : (tMax.x));
+		t1.y = (((tMin.y) < (tMax.y)) ? (tMin.y) : (tMax.y));
+		t1.z = (((tMin.z) < (tMax.z)) ? (tMin.z) : (tMax.z));
+		
+		DirectX::XMFLOAT3 t2 = DirectX::XMFLOAT3();
+		t2.x = (((tMin.x) > (tMax.x)) ? (tMin.x) : (tMax.x));
+		t2.y = (((tMin.y) > (tMax.y)) ? (tMin.y) : (tMax.y));
+		t2.z = (((tMin.z) > (tMax.z)) ? (tMin.z) : (tMax.z));
+
+		float temp = (((t1.x) > (t1.y)) ? (t1.x) : (t1.y));
+		float tNear = (((temp) > (t1.z)) ? (temp) : (t1.z));
+		temp = (((t2.x) < (t2.y)) ? (t2.x) : (t2.y));
+		float tFar = (((temp) < (t2.z)) ? (temp) : (t2.z));
+
+		return tNear < tFar;
+	}
+
+	// https://gdbooks.gitbooks.io/3dcollisions/content/Chapter2/static_aabb_plane.html
+	bool IntersectsPlane(DirectX::XMFLOAT4 normal)
+	{
+		// Convert AABB to center-extents representation
+		DirectX::XMFLOAT3 c = DirectX::XMFLOAT3(		// Compute AABB center
+			(max.x + min.x) * 0.5f,
+			(max.y + min.y) * 0.5f,
+			(max.z + min.z) * 0.5f
+		);
+			
+		DirectX::XMFLOAT3 e = DirectX::XMFLOAT3(		// Compute positive extents
+			max.x - c.x,
+			max.y - c.y,
+			max.z - c.z
+		);
+
+		// Compute the projection interval radius of aabb onto L(t) = c + t * n
+		float r = 
+			e.x*std::abs(normal.x) + 
+			e.y*std::abs(normal.y) + 
+			e.z*std::abs(normal.z);
+
+		// Compute distance of box center from plane
+		float dist = Dot(DirectX::XMFLOAT3(normal.x, normal.y, normal.z), c) - normal.w;
+
+		// Intersection occurs when distance s falls within [-r,+r] interval
+		if (std::abs(dist) <= r)
+			return true;
+
+		// Within Half-space
+		return dist > r;
 	}
 
 	DirectX::XMFLOAT3 Dimensions()
@@ -82,10 +160,17 @@ struct Frustum
 	// https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
 	float DistanceToPoint(DirectX::XMFLOAT4 plane, DirectX::XMFLOAT3 pt)
 	{
-		return plane.x * pt.x + plane.y * pt.y + plane.z * pt.z + plane.w;
+		//  0 ~ point on plane
+		// >0 ~ point in front of plane
+		// <0 ~ point behind plane
+		return 
+			plane.x * pt.x + 
+			plane.y * pt.y + 
+			plane.z * pt.z + 
+			plane.w;
 	}
 
-	bool Overlaps(AABB other)
+	bool Intersects(AABB other)
 	{
 		DirectX::XMFLOAT3 p = other.min;
 

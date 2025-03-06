@@ -597,97 +597,101 @@ namespace
 	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(std::shared_ptr<Scene> scene);
 	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(std::shared_ptr<Scene> scene)
 	{
-		// NOT WORKING
+		// Get Frustum (points) to check octree with
+		Frustum frustum = scene->GetCurrentCamera()->GetFrustum();
+		DirectX::XMFLOAT3* pointsPtr = frustum.points;
+		std::vector<DirectX::XMFLOAT3> points;
+		points.assign(pointsPtr, pointsPtr + 8);
+
+		// Use Octree to get entities to check collision with
+		Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
+		if (!octant)
+			octant = scene->GetOctree().get();
+
+		size_t initialNumEntities = scene->GetEntities().size();
+
+		std::vector<std::shared_ptr<Entity>> entities =
+			octant == nullptr ? scene->GetEntities()
+			: octant->GetRelevantEntities(frustum);
+
+		size_t octreeEntities = entities.size();
+
 		// Example of frustum culling by creating a frustum out of planes and normals
 		// then checking if objects are within those faces
 		// https://learnopengl.com/Guest-Articles/2021/Scene/Frustum-Culling
-		//{
-		//	// Get Frustum (points) to check octree with
-		//	Frustum frustum = scene->GetCurrentCamera()->GetFrustum();
-		//	DirectX::XMFLOAT3* pointsPtr = frustum.points;
-		//	std::vector<DirectX::XMFLOAT3> points;
-		//	points.assign(pointsPtr, pointsPtr + 8);
+		/*
+		{
+			for (int i = entities.size() - 1; i >= 0; i--)
+			{
+				bool visible = true;
+				for (int j = 0; j < 6; j++)
+				{
+					if (!visible)
+						break;
+					if (!entities[i]->GetAABB().IntersectsPlane(frustum.normals[j]))
+						visible = false;
+				}
+				if(!visible)
+					entities.erase(entities.begin() + i);
+			}
 
-		//	// Use Octree to get entities to check collision with
-		//	Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
-		//	std::vector<std::shared_ptr<Entity>> entities =
-		//		octant == nullptr ? scene->GetEntities()
-		//		: octant->GetAllEntities();
-
-
-		//	entities = scene->GetEntities();
-		//	// Frustum Culling
-		//	for (int i = entities.size() - 1; i >= 0; i--)
-		//	{
-		//		if (!frustum.Overlaps(entities[i]->GetAABB()))
-		//			entities.erase(entities.begin() + i);
-		//	}
-
-		//	return entities;
-		//}
+			return entities;
+		}
+		*/
 		
 		
-		
+		// View Space Culling
 		// Example of frustum culling by using the camera's view and projection matrices
 		// instead of creating a Frustum object
 		// https://bruop.github.io/frustum_culling/
 		{
 			/*
-			// Get data to calculate a rough estimation of the frustum
-			DirectX::XMFLOAT3 pos = scene->GetCurrentCamera()->GetTransform()->GetPosition();
-			DirectX::XMFLOAT3 fwd = scene->GetCurrentCamera()->GetTransform()->GetForward();
-			DirectX::XMFLOAT3 right = scene->GetCurrentCamera()->GetTransform()->GetRight();
-			DirectX::XMFLOAT3 up = scene->GetCurrentCamera()->GetTransform()->GetUp();
-			float farClip = scene->GetCurrentCamera()->GetFarClip();
-			float fov = scene->GetCurrentCamera()->GetFieldOfView();
-			float aspectRatio = scene->GetCurrentCamera()->GetAspectRatio();
-			float farHeight = 2 * std::tan(fov / 2) * farClip;
-			float farWidth = farHeight * aspectRatio;
+			// Get points to pass into octree traversal
+			{
+				// Get data to calculate a rough estimation of the frustum
+				DirectX::XMFLOAT3 pos = scene->GetCurrentCamera()->GetTransform()->GetPosition();
+				DirectX::XMFLOAT3 fwd = scene->GetCurrentCamera()->GetTransform()->GetForward();
+				DirectX::XMFLOAT3 right = scene->GetCurrentCamera()->GetTransform()->GetRight();
+				DirectX::XMFLOAT3 up = scene->GetCurrentCamera()->GetTransform()->GetUp();
+				float farClip = scene->GetCurrentCamera()->GetFarClip();
+				float fov = scene->GetCurrentCamera()->GetFieldOfView();
+				float aspectRatio = scene->GetCurrentCamera()->GetAspectRatio();
+				float farHeight = 2 * std::tan(fov / 2) * farClip;
+				float farWidth = farHeight * aspectRatio;
 
-			// Calculate Frustum (points)
-			// https://stackoverflow.com/questions/13665932/calculating-the-viewing-frustum-in-a-3d-space
-			std::vector<DirectX::XMFLOAT3> points;
-			points.push_back(pos); // Cam Position
-			DirectX::XMVECTOR posVec = DirectX::XMLoadFloat3(&pos); 
+				// Calculate Frustum (points)
+				// https://stackoverflow.com/questions/13665932/calculating-the-viewing-frustum-in-a-3d-space
+				std::vector<DirectX::XMFLOAT3> points;
+				points.push_back(pos); // Cam Position
+				DirectX::XMVECTOR posVec = DirectX::XMLoadFloat3(&pos); 
 
-			DirectX::XMVECTOR fwdVec = DirectX::XMLoadFloat3(&fwd);
-			fwdVec = DirectX::XMVectorScale(fwdVec, farClip);
-			DirectX::XMVECTOR farCenter = DirectX::XMVectorAdd(fwdVec, posVec); // Center of far clip plane
+				DirectX::XMVECTOR fwdVec = DirectX::XMLoadFloat3(&fwd);
+				fwdVec = DirectX::XMVectorScale(fwdVec, farClip);
+				DirectX::XMVECTOR farCenter = DirectX::XMVectorAdd(fwdVec, posVec); // Center of far clip plane
 
-			DirectX::XMVECTOR rightVec = DirectX::XMLoadFloat3(&right);
-			rightVec = DirectX::XMVectorScale(rightVec, farWidth / 2);
+				DirectX::XMVECTOR rightVec = DirectX::XMLoadFloat3(&right);
+				rightVec = DirectX::XMVectorScale(rightVec, farWidth / 2);
 
-			DirectX::XMVECTOR upVec = DirectX::XMLoadFloat3(&up);
-			upVec = DirectX::XMVectorScale(upVec, farHeight / 2);
+				DirectX::XMVECTOR upVec = DirectX::XMLoadFloat3(&up);
+				upVec = DirectX::XMVectorScale(upVec, farHeight / 2);
 
-			DirectX::XMVECTOR farBottomLeft = DirectX::XMVectorSubtract( // Bottom left of far clip plane
-				DirectX::XMVectorSubtract(farCenter, upVec), rightVec );
-			points.push_back({});
-			DirectX::XMStoreFloat3(&points[1], farBottomLeft);
+				DirectX::XMVECTOR farBottomLeft = DirectX::XMVectorSubtract( // Bottom left of far clip plane
+					DirectX::XMVectorSubtract(farCenter, upVec), rightVec );
+				points.push_back({});
+				DirectX::XMStoreFloat3(&points[1], farBottomLeft);
 
-			DirectX::XMVECTOR farTopRight = DirectX::XMVectorAdd( // Top Right of far clip plane
-				DirectX::XMVectorAdd(farCenter, upVec), rightVec);
-			points.push_back({});
-			DirectX::XMStoreFloat3(&points[2], farTopRight);
+				DirectX::XMVECTOR farTopRight = DirectX::XMVectorAdd( // Top Right of far clip plane
+					DirectX::XMVectorAdd(farCenter, upVec), rightVec);
+				points.push_back({});
+				DirectX::XMStoreFloat3(&points[2], farTopRight);
 
-			// Use Octree to get entities to check collision with
-			Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
-			std::vector<std::shared_ptr<Entity>> entities = 
-				octant == nullptr ? scene->GetEntities() 
-				: octant->GetAllEntities();
+				// Use Octree to get entities to check collision with
+				Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
+				std::vector<std::shared_ptr<Entity>> entities = 
+					octant == nullptr ? scene->GetEntities() 
+					: octant->GetAllEntities();
+			}
 				*/
-
-			// Get Frustum (points) to check octree with
-			Frustum frustum = scene->GetCurrentCamera()->GetFrustum();
-			DirectX::XMFLOAT3* pointsPtr = frustum.points;
-			std::vector<DirectX::XMFLOAT3> points;
-			points.assign(pointsPtr, pointsPtr + 8);
-
-			// Use Octree to get entities to check collision with
-			Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
-			std::vector<std::shared_ptr<Entity>> entities =
-				octant == nullptr ? scene->GetEntities()
-				: octant->GetAllEntities();
 
 			// Frustum culling
 			DirectX::XMFLOAT4X4 proj = scene->GetCurrentCamera()->GetProjection();
@@ -700,22 +704,25 @@ namespace
 			{
 				// Use out min max to define four adjacent corners
 				AABB aabb = entities[index]->GetAABB();
-				DirectX::XMFLOAT4 corners[8] = {
-				{aabb.min.x, aabb.min.y, aabb.min.z, 1.0}, // x y z //
-				{aabb.max.x, aabb.min.y, aabb.min.z, 1.0}, // X y z //
-				{aabb.min.x, aabb.max.y, aabb.min.z, 1.0}, // x Y z //
-				{aabb.max.x, aabb.max.y, aabb.min.z, 1.0}, // X Y z
+				const int Num_Corners = 9;
+				DirectX::XMFLOAT4 corners[Num_Corners] = {
+				{aabb.min.x, aabb.min.y, aabb.min.z, 1.0f}, // x y z //
+				{aabb.max.x, aabb.min.y, aabb.min.z, 1.0f}, // X y z //
+				{aabb.min.x, aabb.max.y, aabb.min.z, 1.0f}, // x Y z //
+				{aabb.max.x, aabb.max.y, aabb.min.z, 1.0f}, // X Y z
+														
+				{aabb.min.x, aabb.min.y, aabb.max.z, 1.0f}, // x y Z //
+				{aabb.max.x, aabb.min.y, aabb.max.z, 1.0f}, // X y Z
+				{aabb.min.x, aabb.max.y, aabb.max.z, 1.0f}, // x Y Z
+				{aabb.max.x, aabb.max.y, aabb.max.z, 1.0f}, // X Y Z
 
-				{aabb.min.x, aabb.min.y, aabb.max.z, 1.0}, // x y Z //
-				{aabb.max.x, aabb.min.y, aabb.max.z, 1.0}, // X y Z
-				{aabb.min.x, aabb.max.y, aabb.max.z, 1.0}, // x Y Z
-				{aabb.max.x, aabb.max.y, aabb.max.z, 1.0}, // X Y Z
+				{(aabb.min.x + aabb.max.x) / 2, (aabb.min.y + aabb.max.y) / 2, (aabb.min.z + aabb.max.z) / 2, 1.0f}
 				};
 
 				bool inside = false;
 
 				// Transform corners
-				for (int c = 0; c < 8; c++)
+				for (int c = 0; c < Num_Corners; c++)
 				{
 					if (inside)
 						break;
@@ -736,6 +743,8 @@ namespace
 					entities.erase(entities.begin() + index);
 
 			}
+
+			size_t frustumCullEntities = entities.size();
 
 			return entities;
 		}

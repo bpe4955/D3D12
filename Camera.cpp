@@ -151,83 +151,52 @@ void Camera::UpdateProjectionMatrix(float aspectRatio)
 
 void Camera::UpdateFrustum()
 {
-	
-	
-	// Normals
-	/*
-	//https://learnopengl.com/Guest-Articles/2021/Scene/Frustum-Culling
-	frustum.normals[0] = transform.GetForward();		// Near Face
-	DirectX::XMStoreFloat3(&frustum.normals[1],		// Far Face
-		DirectX::XMVector3Normalize(
-		DirectX::XMVectorScale(fwd, -1)));
-
-	DirectX::XMStoreFloat3(&frustum.normals[2],		// Right Face
-		DirectX::XMVector3Normalize(
-		DirectX::XMVector3Cross(
-			DirectX::XMVectorSubtract( frontMultFar, rightMultFarWidth),
-			up
-		)));
-	DirectX::XMStoreFloat3(&frustum.normals[3],		// Left Face
-		DirectX::XMVector3Normalize(
-		DirectX::XMVector3Cross(
-			up,
-			DirectX::XMVectorAdd(frontMultFar, rightMultFarWidth)
-		)));
-
-	DirectX::XMStoreFloat3(&frustum.normals[4],		// Top Face
-		DirectX::XMVector3Normalize(
-		DirectX::XMVector3Cross(
-			right,
-			DirectX::XMVectorSubtract(frontMultFar, upMultFarHeight)
-		)));
-	DirectX::XMStoreFloat3(&frustum.normals[5],		// Bottom Face
-		DirectX::XMVector3Normalize(
-		DirectX::XMVector3Cross(
-			DirectX::XMVectorAdd(frontMultFar, upMultFarHeight),
-			right
-		)));
-		*/
-	
+	// Get normals from ViewProjection Matrix
+	// Not Working
 	// https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
-	DirectX::XMFLOAT4X4 viewTemp = GetView();
-	DirectX::XMFLOAT4X4 projTemp = GetProjection();
-	DirectX::XMFLOAT4X4 vp;
-	DirectX::XMStoreFloat4x4(&vp,
-		DirectX::XMMatrixMultiply(
-			DirectX::XMLoadFloat4x4(&projTemp),
-			DirectX::XMLoadFloat4x4(&viewTemp)
-		));
+	/*
+	{
+		DirectX::XMFLOAT4X4 viewTemp = GetView();
+		DirectX::XMFLOAT4X4 projTemp = GetProjection();
+		DirectX::XMFLOAT4X4 vp;
+		DirectX::XMStoreFloat4x4(&vp,
+			DirectX::XMMatrixMultiply(
+				DirectX::XMLoadFloat4x4(&projTemp),
+				DirectX::XMLoadFloat4x4(&viewTemp)
+			));
 
-	frustum.normals[0].x = vp._13;					// Near Face
-	frustum.normals[0].y = vp._23;
-	frustum.normals[0].z = vp._33;
-	frustum.normals[0].w = vp._43;
+		frustum.normals[0].x = vp._13;					// Near Face
+		frustum.normals[0].y = vp._23;
+		frustum.normals[0].z = vp._33;
+		frustum.normals[0].w = vp._43;
 
-	frustum.normals[1].x = vp._14 - vp._13;			// Far Face
-	frustum.normals[1].y = vp._24 - vp._23;
-	frustum.normals[1].z = vp._34 - vp._33;
-	frustum.normals[1].w = vp._44 - vp._43;
+		frustum.normals[1].x = vp._14 - vp._13;			// Far Face
+		frustum.normals[1].y = vp._24 - vp._23;
+		frustum.normals[1].z = vp._34 - vp._33;
+		frustum.normals[1].w = vp._44 - vp._43;
 
-	frustum.normals[2].x = vp._14 + vp._11;			// Left Face
-	frustum.normals[2].y = vp._24 + vp._21;			
-	frustum.normals[2].z = vp._34 + vp._31;
-	frustum.normals[2].w = vp._44 + vp._41;
+		frustum.normals[2].x = vp._14 + vp._11;			// Left Face
+		frustum.normals[2].y = vp._24 + vp._21;			
+		frustum.normals[2].z = vp._34 + vp._31;
+		frustum.normals[2].w = vp._44 + vp._41;
 
-	frustum.normals[3].x = vp._14 - vp._11;			// Right Face
-	frustum.normals[3].y = vp._24 - vp._21;
-	frustum.normals[3].z = vp._34 - vp._31;
-	frustum.normals[3].w = vp._44 - vp._41;
+		frustum.normals[3].x = vp._14 - vp._11;			// Right Face
+		frustum.normals[3].y = vp._24 - vp._21;
+		frustum.normals[3].z = vp._34 - vp._31;
+		frustum.normals[3].w = vp._44 - vp._41;
 
-	frustum.normals[4].x = vp._14 + vp._12;			// Bottom Face
-	frustum.normals[4].y = vp._24 + vp._22;
-	frustum.normals[4].z = vp._34 + vp._32;
-	frustum.normals[4].w = vp._44 + vp._42;
+		frustum.normals[4].x = vp._14 + vp._12;			// Bottom Face
+		frustum.normals[4].y = vp._24 + vp._22;
+		frustum.normals[4].z = vp._34 + vp._32;
+		frustum.normals[4].w = vp._44 + vp._42;
 
-	frustum.normals[5].x = vp._14 - vp._12;			// Top Face
-	frustum.normals[5].y = vp._24 - vp._22;
-	frustum.normals[5].z = vp._34 - vp._32;
-	frustum.normals[5].z = vp._44 - vp._42;
-
+		frustum.normals[5].x = vp._14 - vp._12;			// Top Face
+		frustum.normals[5].y = vp._24 - vp._22;
+		frustum.normals[5].z = vp._34 - vp._32;
+		frustum.normals[5].z = vp._44 - vp._42;
+	}
+	*/
+	
 	// Variables
 	const float halfFarHeight = std::tan(fieldOfView * 0.5f) * farClip;
 	const float halfFarWidth = halfFarHeight * aspectRatio;
@@ -255,40 +224,91 @@ void Camera::UpdateFrustum()
 	DirectX::XMVECTOR nearCenter = DirectX::XMVectorAdd(frontMultNear, pos);
 
 	// Points
-	DirectX::XMStoreFloat3(&frustum.points[0],		// Top Right Far
-		DirectX::XMVectorAdd(farCenter,
-			DirectX::XMVectorAdd(upMultFarHeight, rightMultFarWidth)
-		));
-	DirectX::XMStoreFloat3(&frustum.points[1],		// Bottom Left Far
-		DirectX::XMVectorSubtract(farCenter,
-			DirectX::XMVectorAdd(upMultFarHeight, rightMultFarWidth)
-		));
-	DirectX::XMStoreFloat3(&frustum.points[2],		// Top Left Far
-		DirectX::XMVectorAdd(farCenter,
-			DirectX::XMVectorSubtract(upMultFarHeight, rightMultFarWidth)
-		));
-	DirectX::XMStoreFloat3(&frustum.points[3],		// Bottom Right Far
-		DirectX::XMVectorSubtract(farCenter,
-			DirectX::XMVectorSubtract(upMultFarHeight, rightMultFarWidth)
-		));
+	{
+		DirectX::XMStoreFloat3(&frustum.points[0],		// Top Right Far
+			DirectX::XMVectorAdd(farCenter,
+				DirectX::XMVectorAdd(upMultFarHeight, rightMultFarWidth)
+			));
+		DirectX::XMStoreFloat3(&frustum.points[1],		// Bottom Left Far
+			DirectX::XMVectorSubtract(farCenter,
+				DirectX::XMVectorAdd(upMultFarHeight, rightMultFarWidth)
+			));
+		DirectX::XMStoreFloat3(&frustum.points[2],		// Top Left Far
+			DirectX::XMVectorAdd(farCenter,
+				DirectX::XMVectorSubtract(upMultFarHeight, rightMultFarWidth)
+			));
+		DirectX::XMStoreFloat3(&frustum.points[3],		// Bottom Right Far
+			DirectX::XMVectorSubtract(farCenter,
+				DirectX::XMVectorSubtract(upMultFarHeight, rightMultFarWidth)
+			));
 
 
-	DirectX::XMStoreFloat3(&frustum.points[4],		// Top Right Near
-		DirectX::XMVectorAdd(nearCenter,
-			DirectX::XMVectorAdd(upMultNearHeight, rightMultNearWidth)
-		));
-	DirectX::XMStoreFloat3(&frustum.points[5],		// Bottom Left Near
-		DirectX::XMVectorSubtract(nearCenter,
-			DirectX::XMVectorAdd(upMultNearHeight, rightMultNearWidth)
-		));
-	DirectX::XMStoreFloat3(&frustum.points[6],		// Top Left Near
-		DirectX::XMVectorAdd(nearCenter,
-			DirectX::XMVectorSubtract(upMultNearHeight, rightMultNearWidth)
-		));
-	DirectX::XMStoreFloat3(&frustum.points[7],		// Bottom Right Near
-		DirectX::XMVectorSubtract(nearCenter,
-			DirectX::XMVectorSubtract(upMultNearHeight, rightMultNearWidth)
-		));
+		DirectX::XMStoreFloat3(&frustum.points[4],		// Top Right Near
+			DirectX::XMVectorAdd(nearCenter,
+				DirectX::XMVectorAdd(upMultNearHeight, rightMultNearWidth)
+			));
+		DirectX::XMStoreFloat3(&frustum.points[5],		// Bottom Left Near
+			DirectX::XMVectorSubtract(nearCenter,
+				DirectX::XMVectorAdd(upMultNearHeight, rightMultNearWidth)
+			));
+		DirectX::XMStoreFloat3(&frustum.points[6],		// Top Left Near
+			DirectX::XMVectorAdd(nearCenter,
+				DirectX::XMVectorSubtract(upMultNearHeight, rightMultNearWidth)
+			));
+		DirectX::XMStoreFloat3(&frustum.points[7],		// Bottom Right Near
+			DirectX::XMVectorSubtract(nearCenter,
+				DirectX::XMVectorSubtract(upMultNearHeight, rightMultNearWidth)
+			));
+	}
+
+	// Calculate Normals
+	// https://learnopengl.com/Guest-Articles/2021/Scene/Frustum-Culling
+	{
+		frustum.normals[0] = DirectX::XMFLOAT4(		// Near Face
+			fwdTemp.x,
+			fwdTemp.y,
+			fwdTemp.z,
+			1.0
+		);
+		frustum.normals[0].w = CalcD(frustum.normals[0], frustum.points[4]);
+
+		frustum.normals[1] = DirectX::XMFLOAT4(		// Far Face
+			-fwdTemp.x,
+			-fwdTemp.y,
+			-fwdTemp.z,
+			1.0
+		);
+		frustum.normals[1].w = CalcD(frustum.normals[1], frustum.points[0]);
+
+		DirectX::XMStoreFloat4(&frustum.normals[2],		// Left Face
+			DirectX::XMVector3Cross(
+				up,
+				DirectX::XMVectorAdd(frontMultFar, rightMultFarWidth)
+			));
+		frustum.normals[2].w = CalcD(frustum.normals[2], frustum.points[1]);
+
+		DirectX::XMStoreFloat4(&frustum.normals[3],		// Right Face
+			DirectX::XMVector3Cross(
+				DirectX::XMVectorSubtract(frontMultFar, rightMultFarWidth),
+				up
+			));
+		frustum.normals[3].w = CalcD(frustum.normals[3], frustum.points[0]);
+
+		DirectX::XMStoreFloat4(&frustum.normals[4],		// Bottom Face
+			DirectX::XMVector3Cross(
+				DirectX::XMVectorAdd(frontMultFar, upMultFarHeight),
+				right
+			));
+		frustum.normals[4].w = CalcD(frustum.normals[4], frustum.points[1]);
+
+		DirectX::XMStoreFloat4(&frustum.normals[5],		// Top Face
+			DirectX::XMVector3Cross(
+				right,
+				DirectX::XMVectorSubtract(frontMultFar, upMultFarHeight)
+			));
+		frustum.normals[5].w = CalcD(frustum.normals[5], frustum.points[0]);
+	}
+	
 }
 
 DirectX::XMFLOAT4X4 Camera::GetView()

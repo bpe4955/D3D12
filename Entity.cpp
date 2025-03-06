@@ -46,22 +46,59 @@ AABB Entity::GetAABB()
     if (transformDirty)
     {
         // Rotation means axis are no longer aligned
-        //DirectX::XMFLOAT4X4 worldFloat = transform->GetWorldMatrix();
-        //DirectX::XMMATRIX wm = DirectX::XMLoadFloat4x4(&worldFloat);
-        DirectX::XMFLOAT3 transFloat = transform->GetPosition();
-        DirectX::XMFLOAT3 scaleFloat = transform->GetScale();
-        DirectX::XMMATRIX transmat = DirectX::XMMatrixTranslationFromVector(XMLoadFloat3(&transFloat));
-        DirectX::XMMATRIX scalemat = DirectX::XMMatrixScalingFromVector(XMLoadFloat3(&scaleFloat));
-        DirectX::XMMATRIX wm = DirectX::XMMatrixMultiply(scalemat, transmat);
+        DirectX::XMFLOAT4X4 worldFloat = transform->GetWorldMatrix();
+        DirectX::XMMATRIX wm = DirectX::XMLoadFloat4x4(&worldFloat);
+        //DirectX::XMFLOAT3 transFloat = transform->GetPosition();
+        //DirectX::XMFLOAT3 scaleFloat = transform->GetScale();
+        //DirectX::XMMATRIX transmat = DirectX::XMMatrixTranslationFromVector(XMLoadFloat3(&transFloat));
+        //DirectX::XMMATRIX scalemat = DirectX::XMMatrixScalingFromVector(XMLoadFloat3(&scaleFloat));
+        //DirectX::XMMATRIX wm = DirectX::XMMatrixMultiply(scalemat, transmat);
+        //Transform* parent = transform->GetParent();
+        //if (parent)
+        //{
+        //    DirectX::XMFLOAT3 ptransFloat = parent->GetPosition();
+        //    DirectX::XMFLOAT3 pscaleFloat = parent->GetScale();
+        //    DirectX::XMMATRIX ptransmat = DirectX::XMMatrixTranslationFromVector(XMLoadFloat3(&ptransFloat));
+        //    DirectX::XMMATRIX pscalemat = DirectX::XMMatrixScalingFromVector(XMLoadFloat3(&pscaleFloat));
+        //    DirectX::XMMATRIX pwm = DirectX::XMMatrixMultiply(pscalemat, ptransmat);
+        //    wm *= pwm;
+        //}
 
-        DirectX::XMVECTOR max = DirectX::XMLoadFloat3(&modelAABB.max);
-        DirectX::XMVECTOR min = DirectX::XMLoadFloat3(&modelAABB.min);
+        // Have to transform corners then calculate AABB
+        // Could simply transform max and min, but rotation makes things messy
+        DirectX::XMFLOAT3 corners[8] = {
+                {modelAABB.min.x, modelAABB.min.y, modelAABB.min.z}, // x y z
+                {modelAABB.max.x, modelAABB.min.y, modelAABB.min.z}, // X y z
+                {modelAABB.min.x, modelAABB.max.y, modelAABB.min.z}, // x Y z
+                {modelAABB.max.x, modelAABB.max.y, modelAABB.min.z}, // X Y z
 
-        max = DirectX::XMVector3Transform(max, wm);
-        min = DirectX::XMVector3Transform(min, wm);
+                {modelAABB.min.x, modelAABB.min.y, modelAABB.max.z}, // x y Z
+                {modelAABB.max.x, modelAABB.min.y, modelAABB.max.z}, // X y Z
+                {modelAABB.min.x, modelAABB.max.y, modelAABB.max.z}, // x Y Z
+                {modelAABB.max.x, modelAABB.max.y, modelAABB.max.z}, // X Y Z
+            };
+        // Transform corners
+        for (int c = 0; c < 8; c++)
+        {
+            DirectX::XMStoreFloat3(&corners[c],
+                DirectX::XMVector3Transform(
+                    DirectX::XMLoadFloat3(&corners[c])
+                    , wm));
+        }
 
-        DirectX::XMStoreFloat3(&aabb.max, max);
-        DirectX::XMStoreFloat3(&aabb.min, min);
+        // Calculate AABB
+        aabb.max = DirectX::XMFLOAT3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+        aabb.min = DirectX::XMFLOAT3(FLT_MAX, FLT_MAX, FLT_MAX);
+        for (int c = 0; c < 8; c++)
+        {
+            aabb.max.x = aabb.max.x > corners[c].x ? aabb.max.x : corners[c].x;
+            aabb.max.y = aabb.max.y > corners[c].y ? aabb.max.y : corners[c].y;
+            aabb.max.z = aabb.max.z > corners[c].z ? aabb.max.z : corners[c].z;
+            aabb.min.x = aabb.min.x < corners[c].x ? aabb.min.x : corners[c].x;
+            aabb.min.y = aabb.min.y < corners[c].y ? aabb.min.y : corners[c].y;
+            aabb.min.z = aabb.min.z < corners[c].z ? aabb.min.z : corners[c].z;
+        }
+
         transformDirty = false;
     }
     return aabb;
@@ -70,14 +107,15 @@ AABB Entity::GetAABB()
 // Setters
 void Entity::setTransform(std::shared_ptr<Transform> _transform) 
 { 
+    transform->SetDirtyFunction(nullptr);
     transform = _transform;
     std::function<void()> funcPtr = [this]() { SetTransformDirty(); };
     transform->SetDirtyFunction(funcPtr);
-    transformDirty = true;
+    SetTransformDirty();
 }
 void Entity::SetMeshes(std::vector<std::shared_ptr<Mesh>> _meshes) { meshes = _meshes; }
 void Entity::SetMaterials(std::vector<std::shared_ptr<Material>> _materials) { materials = _materials; }
-void Entity::SetAABB(AABB _aabb) { aabb = _aabb; transformDirty = true; }
+void Entity::SetAABB(AABB _aabb) { aabb = _aabb; SetTransformDirty(); }
 void Entity::SetTransformDirty() 
 { 
     hasMoved = true;

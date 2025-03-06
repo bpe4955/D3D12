@@ -294,6 +294,9 @@ static float endSize[4][2] = { 1.0f, 1.0f };
 static float startColor[4][4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 static float endColor[4][4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
+static float camPos[3];
+static float camRot[3];
+
 void Game::BuildUI()
 {
 	D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
@@ -328,8 +331,59 @@ void Game::BuildUI()
 	}
 	if (ImGui::TreeNode("Camera"))
 	{
-		XMFLOAT3 pos = scene->GetCurrentCamera()->GetTransform()->GetPosition();
-		ImGui::Text("Position: %f, %f, %f", pos.x, pos.y, pos.z);
+		std::shared_ptr<Camera> cam = scene->GetCurrentCamera();
+		XMFLOAT3 pos = cam->GetTransform()->GetPosition();
+		camPos[0] = pos.x;
+		camPos[1] = pos.y;
+		camPos[2] = pos.z;
+		XMFLOAT3 fwd = cam->GetTransform()->GetForward();
+		XMFLOAT3 rot = cam->GetTransform()->GetPitchYawRoll();
+		camRot[0] = rot.x;
+		camRot[1] = rot.y;
+		camRot[2] = rot.z;
+		//ImGui::Text("Position: %f, %f, %f", pos.x, pos.y, pos.z);
+		if (ImGui::DragFloat3("Position", camPos, 0.05f, -100.0f, 100.0f))
+			cam->GetTransform()->SetPosition(camPos[0], camPos[1], camPos[2]);
+		ImGui::Text("Forward: %f, %f, %f", fwd.x, fwd.y, fwd.z);
+		if (ImGui::DragFloat2("Rotation", camRot, 0.05f, -100.0f, 100.0f))
+			cam->GetTransform()->SetRotation(camRot[0], camRot[1], 0);
+
+		if (ImGui::TreeNode("Frustum"))
+		{
+			Frustum fru = cam->GetFrustum();
+			ImGui::Text("Near: %f, %f, %f, %f", 
+				fru.normals[0].x, 
+				fru.normals[0].y, 
+				fru.normals[0].z, 
+				fru.normals[0].w);
+			ImGui::Text("Far: %f, %f, %f, %f",
+				fru.normals[1].x,
+				fru.normals[1].y,
+				fru.normals[1].z,
+				fru.normals[1].w);
+			ImGui::Text("Left: %f, %f, %f, %f",
+				fru.normals[2].x,
+				fru.normals[2].y,
+				fru.normals[2].z,
+				fru.normals[2].w);
+			ImGui::Text("Right: %f, %f, %f, %f",
+				fru.normals[3].x,
+				fru.normals[3].y,
+				fru.normals[3].z,
+				fru.normals[3].w);
+			ImGui::Text("Bottom: %f, %f, %f, %f",
+				fru.normals[4].x,
+				fru.normals[4].y,
+				fru.normals[4].z,
+				fru.normals[4].w);
+			ImGui::Text("Top: %f, %f, %f, %f",
+				fru.normals[5].x,
+				fru.normals[5].y,
+				fru.normals[5].z,
+				fru.normals[5].w);
+			ImGui::TreePop();
+		}
+
 		ImGui::TreePop();
 	}
 	if (ImGui::TreeNode("Scene"))

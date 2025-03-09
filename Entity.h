@@ -20,13 +20,15 @@ public:
 	std::vector<std::shared_ptr<Mesh>> GetMeshes();
 	std::vector<std::shared_ptr<Material>> GetMaterials();
 	AABB GetAABB();
+	Visibility GetVisibility();
 
 	// Setters
-	void setTransform(std::shared_ptr<Transform> _transform);
+	void SetTransform(std::shared_ptr<Transform> _transform);
 	void SetMeshes(std::vector<std::shared_ptr<Mesh>> _mesh);
 	void SetMaterials(std::vector<std::shared_ptr<Material>> _material);
 	void SetAABB(AABB aabb);
 	void SetTransformDirty();
+	void SetColorTint(DirectX::XMFLOAT4 _colorTint);
 
 	bool hasMoved = false;
 
@@ -38,8 +40,11 @@ private:
 	AABB modelAABB;
 	AABB aabb;
 	bool transformDirty;
+	Visibility visibility;
+	bool visibilityDirty;
 
 	// Delegates and Callbacks
-	std::function<void()> dirtyFuncPtr;
+	std::function<void()> dirtyTransFuncPtr;
+	std::function<void()> dirtyVisFuncPtr;
 };
 

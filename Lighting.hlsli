@@ -45,6 +45,7 @@ Texture2D AlbedoTexture : register(t0);
 Texture2D NormalMap : register(t1);
 Texture2D RoughnessMap : register(t2);
 Texture2D MetalMap : register(t3);
+Texture2D OpacityMap : register(t4);
 SamplerState Sampler : register(s0);
 
 // PBR Constants:
@@ -238,17 +239,12 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
     tangent = normalize(tangent);
     float3 viewVector = normalize(cameraPosition - worldPosition);
     
-    // Alpha-Clipping
-    //float alpha = hasOpacityMap ? OpacityMap.Sample(Sampler, uv).r : 1.0f;
-    //alpha *= transparency; // Material's transparency value
-    //clip(alpha - 0.1f);
     
     ///
     /// Texturing
     ///
     uv = uv * uvScale + uvOffset; // Scale and offset UVs
     float4 textureColor = AlbedoTexture.Sample(Sampler, uv);
-    clip(textureColor.a * colorTint.a - 0.1); // Simple Alpha Culling
     float3 surfaceColor = pow(textureColor.rgb, 2.2f); // Surface color with gamma correction
     //surfaceColor = hasMask ? (surfaceColor * TextureMask.Sample(Sampler, uv).rgb) : surfaceColor; // Adjust surface color with mask
     
@@ -260,6 +256,11 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
     float roughness = RoughnessMap.Sample(Sampler, uv).r;
     float metalness = MetalMap.Sample(Sampler, uv).r;
     
+    
+    // Alpha
+    //float alpha = textureColor.a * colorTint.a;
+    float alpha = OpacityMap.Sample(Sampler, uv).r * textureColor.a * colorTint.a; // Material's transparency value
+    clip(alpha - 0.05); // Simple Alpha Culling
     
     // Specular color determination -----------------
     // Assume albedo texture is actually holding specular color where metalness == 1
@@ -316,7 +317,7 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
     //    float3 h = normalize(viewVector + normalize(-light.Direction));
     //    finalColor = lerp(totalLight, reflectionColor, F_Schlick(viewVector, viewVector, F0_NON_METAL));
     //}
-    return float4(finalColor * colorTint.rgb, 1.0f);
+    return float4(finalColor * colorTint.rgb, alpha);
 }
 
 #endif

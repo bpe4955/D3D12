@@ -58,7 +58,7 @@
         {
             "name"      : "cylinder",
             "mesh"      : "Basic Meshes/cylinder",
-            "material"  : "Materials/cobblestone",
+            "material"  : "Materials/water",
             "transform" :
             {
                 "position"  : [5, 0, 0]
@@ -86,7 +86,7 @@
         {
             "name"      : "childSphere",
             "mesh"      : "Basic Meshes/sphere",
-            "material"  : "Materials/cushionBasic",
+            "material"  : "Materials/plastic",
             "transform" :
             {
                 "position"  : [1, 1, 0],

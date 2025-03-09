@@ -1082,16 +1082,29 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 	}
 
 	// Blend State
+	bool blendEnable = true;
 	D3D12_BLEND srcBlend = D3D12_BLEND_ONE;
 	D3D12_BLEND destBlend = D3D12_BLEND_ZERO;
+	D3D12_BLEND destBlendAlpha = D3D12_BLEND_ONE;
 	D3D12_BLEND_OP blendOp = D3D12_BLEND_OP_ADD;
 	D3D12_BLEND_OP blendOpAlpha = D3D12_BLEND_OP_ADD;
 	if (d.contains("blendState"))
 	{
+		if (d["blendState"].contains("blendEnable") && d["blendState"]["blendEnable"].is_string())
+		{
+			std::string input = d["blendState"]["blendEnable"].get<std::string>();
+			std::transform(input.begin(), input.end(), input.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+
+			if (input == "FALSE" || input == "0") { blendEnable = false; }
+			else { blendEnable = true; }
+		}
 		if (d["blendState"].contains("src") && d["blendState"]["src"].is_number_integer())
 		{ srcBlend = d["blendState"]["src"].get<D3D12_BLEND>(); }
 		if (d["blendState"].contains("dest") && d["blendState"]["dest"].is_number_integer())
 		{ destBlend = d["blendState"]["dest"].get<D3D12_BLEND>(); }
+		if (d["blendState"].contains("destAlpha") && d["blendState"]["destAlpha"].is_number_integer())
+		{ destBlendAlpha = d["blendState"]["destAlpha"].get<D3D12_BLEND>(); }
 		if (d["blendState"].contains("blendOp") && d["blendState"]["blendOp"].is_number_integer())
 		{ blendOp = d["blendState"]["blendOp"].get<D3D12_BLEND_OP>(); blendOpAlpha = blendOp; }
 	}
@@ -1125,11 +1138,11 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 		psoDesc.DepthStencilState.DepthEnable = depthEnable;
 		psoDesc.DepthStencilState.DepthFunc = compFunc;
 		psoDesc.DepthStencilState.DepthWriteMask = depthWrite;
-		psoDesc.BlendState.RenderTarget[0].BlendEnable = true;
+		psoDesc.BlendState.RenderTarget[0].BlendEnable = blendEnable;
 		psoDesc.BlendState.RenderTarget[0].SrcBlend = srcBlend;
 		psoDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 		psoDesc.BlendState.RenderTarget[0].DestBlend = destBlend;
-		psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+		psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = destBlendAlpha;
 		psoDesc.BlendState.RenderTarget[0].BlendOp = blendOp;
 		psoDesc.BlendState.RenderTarget[0].BlendOpAlpha = blendOpAlpha;
 		psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
@@ -1266,7 +1279,7 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 	// We have enough to make the material
 	std::shared_ptr<Material> mat = std::make_shared<Material>(pipelineState, rootSig);
 
-	// Check for 3-component tint
+	// Check for 4-component tint
 	if (d.contains("tint") && d["tint"].size() == 4)
 	{
 		DirectX::XMFLOAT4 tint(1, 1, 1, 1);
@@ -1275,6 +1288,21 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 		tint.z = d["tint"][2].get<float>();
 		tint.w = d["tint"][3].get<float>();
 		mat->SetColorTint(tint);
+	}
+
+	// Check for Visibility
+	if (d.contains("visibility") && d["visibility"].is_string())
+	{
+		Visibility vis = Visibility::Opaque;
+		auto input = d["visibility"].get<std::string>();
+		std::transform(input.begin(), input.end(), input.begin(),
+			[](unsigned char c) { return std::toupper(c); });
+
+		if (input == "INVISIBLE") { vis = Visibility::Invisible; }
+		if (input == "OPAQUE") { vis = Visibility::Opaque; }
+		if (input == "TRANSPARENT") { vis = Visibility::Transparent; }
+
+		mat->SetVisibility(vis);
 	}
 
 	// 2-component uvScale
@@ -1341,8 +1369,19 @@ std::shared_ptr<Material> Assets::LoadMaterial(std::wstring path)
 			{ mat->AddTexture(texture, 2); }
 			else if (textureType == "METAL" || textureType == "METALNESS")
 			{ mat->AddTexture(texture, 3); }
+			else if (textureType == "OPACITY" || textureType == "ALPHA")
+			{ 
+				mat->SetVisibility(Visibility::Transparent);
+				mat->AddTexture(texture, 4); 
+			}
 		}
 	}
+	if (!mat->HasTexture(2))
+		mat->AddTexture(GetTexture(L"Textures/white"), 2);
+	if (!mat->HasTexture(3))
+		mat->AddTexture(GetTexture(L"Textures/black"), 3);
+	if (!mat->HasTexture(4))
+		mat->AddTexture(GetTexture(L"Textures/white"), 4);
 
 	// Add the material to our list and return it
 	mat->FinalizeMaterial();
@@ -1964,7 +2003,7 @@ void Assets::ParseComplexMesh(std::wstring path,
 			aiGetMaterialFloat(material, AI_MATKEY_SHININESS, &shininess);
 			aiGetMaterialFloat(material, AI_MATKEY_OPACITY, &opacity);
 			mat->SetRoughness(1 - shininess);
-			mat->SetColorTint(DirectX::XMFLOAT4(diffuseColor.r, diffuseColor.g, diffuseColor.b, diffuseColor.a));
+			mat->SetColorTint(DirectX::XMFLOAT4(diffuseColor.r, diffuseColor.g, diffuseColor.b, opacity != 1 ? opacity : diffuseColor.a));
 
 			// Diffuse Texture
 			aiString diffuseName;
@@ -1995,6 +2034,7 @@ void Assets::ParseComplexMesh(std::wstring path,
 			} else mat->AddTexture(GetTexture(L"Textures/black"), 2);
 
 			mat->AddTexture(GetTexture(L"Textures/black"), 3);
+			mat->AddTexture(GetTexture(L"Textures/white"), 4);
 
 			mat->FinalizeMaterial();
 			materials.push_back(mat);

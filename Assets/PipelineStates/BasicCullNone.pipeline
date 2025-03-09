@@ -20,6 +20,7 @@
     },
     "blendState" : 
     {
+        "blendEnable" : "FALSE",
         "D3D12_BLEND" :
         {
             "1" :   "D3D12_BLEND_ZERO",

@@ -11,12 +11,17 @@ Entity::Entity(std::shared_ptr<Mesh> _mesh,
     materials.push_back(_material);
     transform = std::make_shared<Transform>();
 
-    dirtyFuncPtr = [this]() { SetTransformDirty(); };
-    transform->SetDirtyFunction(dirtyFuncPtr);
+    transformDirty = true;
+    dirtyTransFuncPtr = [this]() { SetTransformDirty(); };
+    transform->SetDirtyFunction(dirtyTransFuncPtr);
+
+    dirtyVisFuncPtr = [this]() { visibilityDirty = true; };
+    visibility = _material->GetVisibility();
+    materials[0]->SetDirtyFunction(dirtyVisFuncPtr);
+    visibilityDirty = false;
 
     modelAABB = meshes[0]->GetAABB();
     aabb = modelAABB;
-    transformDirty = true;
 }
 
 Entity::Entity(std::vector<std::shared_ptr<Mesh>> _meshes,
@@ -28,8 +33,18 @@ Entity::Entity(std::vector<std::shared_ptr<Mesh>> _meshes,
 {
     transform = std::make_shared<Transform>();
 
-    dirtyFuncPtr = [this]() { SetTransformDirty(); };
-    transform->SetDirtyFunction(dirtyFuncPtr);
+    dirtyTransFuncPtr = [this]() { SetTransformDirty(); };
+    transform->SetDirtyFunction(dirtyTransFuncPtr);
+
+    dirtyVisFuncPtr = [this]() { visibilityDirty = true; };
+    visibility = Visibility::Opaque;
+    for (std::shared_ptr<Material> materialPtr : materials)
+    {
+        if (materialPtr->GetVisibility() == Visibility::Transparent)
+            visibility = Visibility::Transparent;
+        materialPtr->SetDirtyFunction(dirtyVisFuncPtr);
+    }
+    visibilityDirty = false;
 
     modelAABB = meshes[0]->GetAABB();
     aabb = modelAABB;
@@ -104,8 +119,27 @@ AABB Entity::GetAABB()
     return aabb;
 }
 
+Visibility Entity::GetVisibility()
+{
+    if (visibilityDirty)
+    {
+        visibility = Visibility::Invisible;
+        for (std::shared_ptr<Material> mat : materials)
+        {
+            if(mat->GetVisibility() == Visibility::Opaque)
+                visibility = Visibility::Opaque;
+            else if (mat->GetVisibility() == Visibility::Transparent)
+            {
+                visibility = Visibility::Transparent;
+                break;
+            }
+        }
+    }
+    return visibility;
+}
+
 // Setters
-void Entity::setTransform(std::shared_ptr<Transform> _transform) 
+void Entity::SetTransform(std::shared_ptr<Transform> _transform) 
 { 
     transform->SetDirtyFunction(nullptr);
     transform = _transform;
@@ -114,10 +148,33 @@ void Entity::setTransform(std::shared_ptr<Transform> _transform)
     SetTransformDirty();
 }
 void Entity::SetMeshes(std::vector<std::shared_ptr<Mesh>> _meshes) { meshes = _meshes; }
-void Entity::SetMaterials(std::vector<std::shared_ptr<Material>> _materials) { materials = _materials; }
+void Entity::SetMaterials(std::vector<std::shared_ptr<Material>> _materials) 
+{ 
+    for (std::shared_ptr<Material> materialPtr : materials)
+        materialPtr->SetDirtyFunction(nullptr);
+
+    materials = _materials; 
+
+    visibility = Visibility::Opaque;
+    for (std::shared_ptr<Material> materialPtr : materials)
+    {
+        if (materialPtr->GetVisibility() == Visibility::Transparent)
+            visibility = Visibility::Transparent;
+        materialPtr->SetDirtyFunction(dirtyVisFuncPtr);
+    }
+    visibilityDirty = false;
+}
 void Entity::SetAABB(AABB _aabb) { aabb = _aabb; SetTransformDirty(); }
 void Entity::SetTransformDirty() 
 { 
     hasMoved = true;
     transformDirty = true; 
+}
+
+void Entity::SetColorTint(DirectX::XMFLOAT4 _colorTint)
+{
+    for (std::shared_ptr<Material> matPtr : materials)
+    {
+        matPtr->SetColorTint(_colorTint);
+    }
 }

@@ -608,13 +608,13 @@ namespace
 		if (!octant)
 			octant = scene->GetOctree().get();
 
-		size_t initialNumEntities = scene->GetEntities().size();
+		//size_t initialNumEntities = scene->GetEntities().size();
 
 		std::vector<std::shared_ptr<Entity>> entities =
 			octant == nullptr ? scene->GetEntities()
 			: octant->GetRelevantEntities(frustum);
 
-		size_t octreeEntities = entities.size();
+		//size_t octreeEntities = entities.size();
 
 		// Example of frustum culling by creating a frustum out of planes and normals
 		// then checking if objects are within those faces
@@ -744,36 +744,52 @@ namespace
 
 			}
 
-			size_t frustumCullEntities = entities.size();
+			//size_t frustumCullEntities = entities.size();
 
 			return entities;
 		}
 		
 	}
+	void SortOpaqueAndTransparent(std::vector<std::shared_ptr<Entity>> in, 
+		std::vector<std::shared_ptr<Entity>>& outOpaque, std::vector<std::shared_ptr<Entity>>& outTransparent);
+	void SortOpaqueAndTransparent(std::vector<std::shared_ptr<Entity>> in,
+		std::vector<std::shared_ptr<Entity>>& outOpaque, std::vector<std::shared_ptr<Entity>>& outTransparent)
+	{
+		for (std::shared_ptr<Entity> ptr : in)
+		{
+			switch (ptr->GetVisibility())
+			{
+			case Visibility::Opaque:
+				outOpaque.push_back(ptr);
+				break;
+			case Visibility::Transparent:
+				outTransparent.push_back(ptr);
+				break;
+			default:
+				break;
+			}
+		}
+	}
 
 	void DrawEntities(std::vector<std::shared_ptr<Entity>> entities,
 		D3D12_GPU_DESCRIPTOR_HANDLE vsPerFramehandle,
 		D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle,
-		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList);
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList,
+		Visibility desiredVisibility = Visibility::Opaque);
 	void DrawEntities(std::vector<std::shared_ptr<Entity>> entities,
 		D3D12_GPU_DESCRIPTOR_HANDLE vsPerFramehandle,
 		D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle,
-		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList)
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList,
+		Visibility desiredVisibility)
 	{
 		// Early exit if no entities to draw
 		if (entities.size() == 0)
 			return;
 
-		// Sort Entities by material
-		std::sort(entities.begin(), entities.end(), [](const auto& e1, const auto& e2)
-			{
-				// Compare pointers to materials
-				return e1->GetMaterials()[0]->GetPipelineState() < e2->GetMaterials()[0]->GetPipelineState();
-			});
-
 		// Draw all of the entities
 		D3D12Helper& d3d12Helper = D3D12Helper::GetInstance();
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> currentPipelineState = 0;
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> currentRootSig = 0;
 		std::shared_ptr<Material> currentMaterial = 0;
 		std::shared_ptr<Mesh> currentMesh = 0;
 		for (std::shared_ptr<Entity> entityPtr : entities)
@@ -785,12 +801,27 @@ namespace
 				if (currentMaterial != entityPtr->GetMaterials()[i])
 				{
 					currentMaterial = entityPtr->GetMaterials()[i];
+					if (currentMaterial->GetVisibility() == Visibility::Invisible) // Early continue if invisible
+						continue;
+					else if (desiredVisibility == Visibility::Opaque && currentMaterial->GetVisibility() != Visibility::Opaque)
+						continue;
+
 					// Swap pipeline state if necessary
-					if (currentPipelineState != currentMaterial->GetPipelineState())
+					if ((currentMaterial->GetVisibility() == Visibility::Opaque 
+							&& currentPipelineState != currentMaterial->GetPipelineState()) || 
+						(currentMaterial->GetVisibility() == Visibility::Transparent 
+							&& currentPipelineState != Assets::GetInstance().GetPiplineState(L"PipelineStates/Transparent")))
 					{
-						currentPipelineState = currentMaterial->GetPipelineState();
+						if (currentMaterial->GetVisibility() == Visibility::Transparent)
+							currentPipelineState = Assets::GetInstance().GetPiplineState(L"PipelineStates/Transparent");
+						else
+							currentPipelineState = currentMaterial->GetPipelineState();
 						cmdList->SetPipelineState(currentPipelineState.Get());
-						cmdList->SetGraphicsRootSignature(currentMaterial->GetRootSignature().Get());
+						if (currentRootSig != currentMaterial->GetRootSignature())
+						{
+							currentRootSig = currentMaterial->GetRootSignature();
+							cmdList->SetGraphicsRootSignature(currentRootSig.Get());
+						}
 						cmdList->IASetPrimitiveTopology(currentMaterial->GetTopology());
 
 						// Input Per Frame Data
@@ -1020,6 +1051,9 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 
 	// Get the sorted renderable list
 	std::vector<std::shared_ptr<Entity>> toDraw = GetVisibleEntities(scene);
+	std::vector<std::shared_ptr<Entity>> opaqueEntities;
+	std::vector<std::shared_ptr<Entity>> transparentEntities;
+	SortOpaqueAndTransparent(toDraw, opaqueEntities, transparentEntities);
 
 	// Collect all per-frame data and copy to GPU
 	// -- VS
@@ -1040,9 +1074,15 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 	D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
 		(void*)(&psPerFrameData), sizeof(PSPerFrameData));
 
-	// Render Entities
-	DrawEntities(toDraw, vsPerFramehandle, psPerFrameHandle,
-		commandList[0]);
+	// Render Opaque Entities
+	// Sort Entities by material
+	std::sort(opaqueEntities.begin(), opaqueEntities.end(), [](const auto& e1, const auto& e2)
+		{
+			// Compare pointers to materials
+			return e1->GetMaterials()[0]->GetPipelineState() < e2->GetMaterials()[0]->GetPipelineState();
+		});
+	DrawEntities(opaqueEntities, vsPerFramehandle, psPerFrameHandle,
+		commandList[0], Visibility::Opaque);
 
 
 	//// Render the Sky
@@ -1143,7 +1183,31 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 		Graphics::commandList[0]->DrawIndexedInstanced(emitterPtr->GetNumLivingParticles() * 6, 1, 0, 0, 0);
 	}
 	
+	// Render Transparent Entities
+	// Sort Entities by distance
+	std::sort(
+		transparentEntities.begin(),
+		transparentEntities.end(),
+		[&](const auto& a, const auto& b) -> bool
+		{
+			// Grab vectors
+			DirectX::XMFLOAT3 aPos = a->GetTransform()->GetPosition();
+			DirectX::XMFLOAT3 bPos = b->GetTransform()->GetPosition();
+			DirectX::XMFLOAT3 camPos = scene->GetCurrentCamera()->GetTransform()->GetPosition();
 
+			// Calc distances and compare
+			float aDist = DirectX::XMVectorGetX(
+				DirectX::XMVector3Length(
+					DirectX::XMVectorSubtract(
+						DirectX::XMLoadFloat3(&aPos), DirectX::XMLoadFloat3(&camPos))));
+			float bDist = DirectX::XMVectorGetX(
+				DirectX::XMVector3Length(
+					DirectX::XMVectorSubtract(
+						DirectX::XMLoadFloat3(&bPos), DirectX::XMLoadFloat3(&camPos))));
+			return aDist > bDist;
+		});
+	DrawEntities(transparentEntities, vsPerFramehandle, psPerFrameHandle,
+		commandList[1], Visibility::Transparent);
 
 	// Perform Frame End operations
 	FrameEnd();

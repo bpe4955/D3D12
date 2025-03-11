@@ -9,7 +9,7 @@ cbuffer PerFrame : register(b0)
     //matrix shadowView;
     //matrix shadowProjection;
 }
-cbuffer perObject : register(b1)
+cbuffer PerObject : register(b1)
 {
     matrix world;
     matrix worldInvTranspose;

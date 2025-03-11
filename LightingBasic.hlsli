@@ -163,7 +163,8 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
     uv *= uvScale;
     // Alpha Clipping
     float4 textureColor = SurfaceTexture.Sample(Sampler, uv);
-    clip(textureColor.a - 0.1);
+    float alpha = textureColor.a * colorTint.a;
+    clip(alpha - 0.05);
     float3 surfaceColor = pow(textureColor.rgb, 2.2f) * colorTint.rbg;
     float specScale = SpecularMap.Sample(Sampler, uv).r;
     if (specScale == 0)
@@ -203,7 +204,7 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
 	//    // Interpolate between the surface color and reflection color using a Fresnel term
     //    finalColor = lerp(totalLight, reflectionColor, SimpleFresnel(normal, viewVector, F0_NON_METAL));
     //}
-    return float4(finalColor, 1);
+    return float4(finalColor, alpha);
 }
 
 #endif

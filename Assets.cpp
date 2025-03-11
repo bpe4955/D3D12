@@ -1009,6 +1009,9 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 	D3D12_FILL_MODE fillMode = D3D12_FILL_MODE_SOLID;
 	D3D12_CULL_MODE cullMode = D3D12_CULL_MODE_BACK;
 	bool depthClipEnable = true;
+	int depthBias = 0;
+	float depthBiasClamp = 0;
+	float slopeScaledDepthBias = 1;
 	if (d.contains("rasterizer"))
 	{
 		if (d["rasterizer"].contains("fill") && d["rasterizer"]["fill"].is_string())
@@ -1037,6 +1040,15 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 				[](unsigned char c) { return std::toupper(c); });
 
 			if (input == "FALSE" || input == "0") { depthClipEnable = false; }
+		}
+		if (d["rasterizer"].contains("bias"))
+		{
+			if (d["rasterizer"]["bias"].contains("depthBias") && d["rasterizer"]["bias"]["depthBias"].is_number_integer())
+				{ depthBias = d["rasterizer"]["bias"]["depthBias"].get<int>(); }
+			if (d["rasterizer"]["bias"].contains("depthBiasClamp") && d["rasterizer"]["bias"]["depthBiasClamp"].is_number_float())
+				{ depthBiasClamp = d["rasterizer"]["bias"]["depthBiasClamp"].get<float>(); }
+			if (d["rasterizer"]["bias"].contains("slopeScaledDepthBias") && d["rasterizer"]["bias"]["slopeScaledDepthBias"].is_number_float())
+				{ slopeScaledDepthBias = d["rasterizer"]["bias"]["slopeScaledDepthBias"].get<float>(); }
 		}
 	}
 
@@ -1082,7 +1094,7 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 	}
 
 	// Blend State
-	bool blendEnable = true;
+	bool blendEnable = false;
 	D3D12_BLEND srcBlend = D3D12_BLEND_ONE;
 	D3D12_BLEND destBlend = D3D12_BLEND_ZERO;
 	D3D12_BLEND destBlendAlpha = D3D12_BLEND_ONE;
@@ -1109,6 +1121,19 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 		{ blendOp = d["blendState"]["blendOp"].get<D3D12_BLEND_OP>(); blendOpAlpha = blendOp; }
 	}
 
+	// Render Target
+	int numRenderTargets = 1;
+	DXGI_FORMAT rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+	if (d.contains("numRenderTargets") && d["numRenderTargets"].is_number_integer())
+	{
+		numRenderTargets = d["numRenderTargets"].get<int>();
+	}
+	DXGI_FORMAT dsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	if (d.contains("dsvFormat") && d["dsvFormat"].is_number_integer())
+	{
+		dsvFormat = (DXGI_FORMAT)d["dsvFormat"].get<int>();
+	}
+
 	// Pipeline state
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = {};
 	{
@@ -1126,15 +1151,19 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 		psoDesc.PS.pShaderBytecode = pixelShaderByteCode->GetBufferPointer();
 		psoDesc.PS.BytecodeLength = pixelShaderByteCode->GetBufferSize();
 		// -- Render targets ---
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		psoDesc.NumRenderTargets = numRenderTargets;
+		for(int t=0; t<numRenderTargets; t++)
+			psoDesc.RTVFormats[t] = rtvFormat;
+		psoDesc.DSVFormat = dsvFormat;
 		psoDesc.SampleDesc.Count = 1;
 		psoDesc.SampleDesc.Quality = 0;
 		// -- States ---
 		psoDesc.RasterizerState.FillMode = fillMode;
 		psoDesc.RasterizerState.CullMode = cullMode;
 		psoDesc.RasterizerState.DepthClipEnable = depthClipEnable;
+		psoDesc.RasterizerState.DepthBias = depthBias;
+		psoDesc.RasterizerState.DepthBiasClamp = depthBiasClamp;
+		psoDesc.RasterizerState.SlopeScaledDepthBias = slopeScaledDepthBias;
 		psoDesc.DepthStencilState.DepthEnable = depthEnable;
 		psoDesc.DepthStencilState.DepthFunc = compFunc;
 		psoDesc.DepthStencilState.DepthWriteMask = depthWrite;
@@ -1154,6 +1183,8 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstri
 
 		int i = 0;
 	}
+
+	assert(pipelineState);
 
 	pipelineStates.insert({ filename, pipelineState });
 
@@ -1555,7 +1586,10 @@ std::shared_ptr<Scene> Assets::LoadScene(std::wstring path)
 	}
 	std::vector skyLights = scene->GetSky()->GetLights();
 	for (int i = 0; i < skyLights.size(); i++) 
-		{ scene->AddLight(skyLights[i]); }
+		{ 
+			scene->AddLight(skyLights[i]); 
+			scene->AddShadowLight(skyLights[i]);
+		}
 
 	// Check for entities
 	if (sceneJson.contains("entities") && sceneJson["entities"].is_array())

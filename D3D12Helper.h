@@ -59,7 +59,9 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE LoadTextureDDS(const wchar_t* file, bool generateMips = true, bool isCubeMap = false);
 	D3D12_GPU_DESCRIPTOR_HANDLE CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(
 		D3D12_CPU_DESCRIPTOR_HANDLE firstDescriptorToCopy,
-		unsigned int numDescriptorsToCopy);
+		unsigned int numDescriptorsToCopy,
+		unsigned int existingSRVDescriptorOffset = 0);
+	unsigned int GetSRVDescriptorOffset();
 private:
 	// Overall device
 	Microsoft::WRL::ComPtr<ID3D12Device> device;

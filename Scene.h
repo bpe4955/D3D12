@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include "BufferStructs.h"
+#include "ShadowLight.h"
 #include "Camera.h"
 #include "Entity.h"
 #include "Sky.h"
@@ -23,6 +24,7 @@ public:
 	std::vector<std::shared_ptr<Entity>>& GetEntities();
 	std::vector<std::shared_ptr<Entity>>& GetOpaqueEntities();
 	std::vector<Light>& GetLights();
+	std::vector<std::shared_ptr<ShadowLight>>& GetShadowLights();
 	std::vector<std::shared_ptr<Camera>>& GetCameras();
 	std::shared_ptr<Camera> GetCurrentCamera();
 	std::shared_ptr<Sky> GetSky();
@@ -39,6 +41,7 @@ public:
 	// Modifiers
 	void AddEntity(std::shared_ptr<Entity> entity);
 	void AddLight(Light light);
+	void AddShadowLight(Light light);
 	void AddCamera(std::shared_ptr<Camera> camera);
 	void AddEmitter(std::shared_ptr<Emitter> emitter);
 
@@ -53,6 +56,7 @@ private:
 	// Vectors of various scene elements
 	std::vector<std::shared_ptr<Entity>> entities; // Could also create a map / trie for specific entities
 	std::vector<Light> lights;
+	std::vector<std::shared_ptr<ShadowLight>> shadowLights;
 	std::vector<std::shared_ptr<Camera>> cameras;
 	std::vector<std::shared_ptr<Emitter>> emitters;
 

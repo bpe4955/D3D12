@@ -232,27 +232,38 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3D12Helper::LoadTextureDDS(const wchar_t* file, boo
 // to the final descriptor heap that we use when drawing(the CBV / SRV descriptor heap) 
 // and return the handle to the location of the first one
 // --------------------------------------------------------
-D3D12_GPU_DESCRIPTOR_HANDLE D3D12Helper::CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE firstDescriptorToCopy, unsigned int numDescriptorsToCopy)
+D3D12_GPU_DESCRIPTOR_HANDLE D3D12Helper::CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(
+	D3D12_CPU_DESCRIPTOR_HANDLE firstDescriptorToCopy, unsigned int numDescriptorsToCopy,
+	unsigned int existingSRVDescriptorOffset)
 {
 	// Grab the actual heap start on both sides and offset to the next open SRV portion
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle =
 		cbvSrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle =
 		cbvSrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	cpuHandle.ptr += (SIZE_T)srvDescriptorOffset * cbvSrvDescriptorHeapIncrementSize;
-	gpuHandle.ptr += (SIZE_T)srvDescriptorOffset * cbvSrvDescriptorHeapIncrementSize;
+	if (existingSRVDescriptorOffset == 0)
+	{
+		cpuHandle.ptr += (SIZE_T)srvDescriptorOffset * cbvSrvDescriptorHeapIncrementSize;
+		gpuHandle.ptr += (SIZE_T)srvDescriptorOffset * cbvSrvDescriptorHeapIncrementSize;
+	}
+	else {
+		cpuHandle.ptr += (SIZE_T)existingSRVDescriptorOffset * cbvSrvDescriptorHeapIncrementSize;
+		gpuHandle.ptr += (SIZE_T)existingSRVDescriptorOffset * cbvSrvDescriptorHeapIncrementSize;
+	}
 	// We know where to copy these descriptors, so copy all of them and remember the new offset
 	device->CopyDescriptorsSimple(
 		numDescriptorsToCopy,
 		cpuHandle,
 		firstDescriptorToCopy,
 		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	srvDescriptorOffset += numDescriptorsToCopy;
+	if(existingSRVDescriptorOffset == 0)
+		srvDescriptorOffset += numDescriptorsToCopy;
 	// Pass back the GPU handle to the start of this section
 	// in the final CBV/SRV heap so the caller can use it later
 	return gpuHandle;
 
 }
+unsigned int D3D12Helper::GetSRVDescriptorOffset() { return srvDescriptorOffset; }
 
 // --------------------------------------------------------
 // Creates a single CB upload heap which will store all
@@ -332,7 +343,7 @@ void D3D12Helper::CreateImGuiHeap()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC DescriptorImGuiRender = {};
 	DescriptorImGuiRender.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	DescriptorImGuiRender.NumDescriptors = 3;
+	DescriptorImGuiRender.NumDescriptors = numBackBuffers;
 	DescriptorImGuiRender.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	device->CreateDescriptorHeap(&DescriptorImGuiRender, IID_PPV_ARGS(imGuiHeap.GetAddressOf()));
 }

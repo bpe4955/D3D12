@@ -236,6 +236,14 @@ void Game::Update(float deltaTime, float totalTime)
 	scene->GetLights()[0].Position = currentCamera->GetTransform()->GetPosition();
 	scene->GetLights()[0].Direction = MouseDirection();
 
+	if (scene->GetShadowLights().size() == 1)
+		scene->AddShadowLight(scene->GetLights()[0]);
+	else
+	{
+		scene->GetShadowLights()[1]->SetPosition(scene->GetLights()[0].Position);
+		scene->GetShadowLights()[1]->SetDirection(scene->GetLights()[0].Direction);
+	}
+
 	// Scene
 	scene->Update(deltaTime, totalTime);
 }
@@ -404,6 +412,14 @@ void Game::BuildUI()
 			currentCameraIndex = 0;
 			scene->GetCurrentCamera()->UpdateProjectionMatrix(Window::AspectRatio());
 			CreateLights();
+		}
+
+		if (ImGui::TreeNode("Shadow Maps"))
+		{
+			for (std::shared_ptr<ShadowLight> light : scene->GetShadowLights())
+				if(light->GetGPUSRVHandle().ptr)
+					ImGui::Image((ImTextureID)light->GetGPUSRVHandle().ptr, ImVec2(512, 512));
+			ImGui::TreePop();
 		}
 
 		ImGui::TreePop();

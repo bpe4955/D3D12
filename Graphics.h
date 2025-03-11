@@ -15,7 +15,7 @@ namespace Graphics
 {
 	// --- GLOBAL VARS ---
 	inline static const unsigned int numBackBuffers = 3;
-	inline static const unsigned int numCommandLists = 2;
+	inline static const unsigned int numCommandLists = 3;
 	inline unsigned int currentSwapBuffer;
 	inline Microsoft::WRL::ComPtr<ID3D12Device> Device;
 	inline Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain;

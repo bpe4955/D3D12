@@ -43,6 +43,30 @@ struct AABB
 	DirectX::XMFLOAT3 max;
 	DirectX::XMFLOAT3 min;
 
+	// https://gamedev.stackexchange.com/questions/156870/how-do-i-implement-a-aabb-sphere-collision
+	// Returns the squared distance between a point p and an AABB b
+	float SqDistPointAABB(DirectX::XMFLOAT3 p)
+	{
+		float sqDist = 0.0f;
+		// for each axis count any excess distance outside box extents
+		{
+			float v = p.x;
+			if (v < this->min.x) sqDist += (this->min.x - v) * (this->min.x - v);
+			if (v > this->max.x) sqDist += (v - this->max.x) * (v - this->max.x);
+		}
+		{
+			float v = p.y;
+			if (v < this->min.y) sqDist += (this->min.y - v) * (this->min.y - v);
+			if (v > this->max.y) sqDist += (v - this->max.y) * (v - this->max.y);
+		}
+		{
+			float v = p.z;
+			if (v < this->min.z) sqDist += (this->min.z - v) * (this->min.z - v);
+			if (v > this->max.z) sqDist += (v - this->max.z) * (v - this->max.z);
+		}
+		return sqDist;
+	}
+
 	bool Contains(DirectX::XMFLOAT3 point)
 	{
 		return
@@ -65,6 +89,47 @@ struct AABB
 			this->min.z <= other.min.z &&
 			this->max.z >= other.max.z;
 
+	}
+
+	bool Contains(DirectX::XMFLOAT3 center, float radius)
+	{
+		float sqDist = SqDistPointAABB(center);
+
+		if (sqDist != 0)	// Center outside of AABB
+			return false;
+
+		// for each axis check distance from radius
+		{
+			float v = center.x;
+			if (abs(this->min.x - v) < radius ||
+				abs(this->max.x - v) < radius)
+				return false;
+		}
+		{
+			float v = center.y;
+			if (abs(this->min.y - v) < radius ||
+				abs(this->max.y - v) < radius)
+				return false;
+		}
+		{
+			float v = center.z;
+			if (abs(this->min.z - v) < radius ||
+				abs(this->max.z - v) < radius)
+				return false;
+		}
+
+		return true;
+	}
+
+	bool Intersects(DirectX::XMFLOAT3 center, float radius)
+	{
+		// Compute squared distance between sphere center and AABB
+		// the sqrt(dist) is fine to use as well, but this is faster.
+		float sqDist = SqDistPointAABB(center);
+
+		// Sphere and AABB intersect if the (squared) distance between them is
+		// less than the (squared) sphere radius.
+		return sqDist <= radius * radius;
 	}
 
 	// https://gist.github.com/DomNomNom/46bb1ce47f68d255fd5d

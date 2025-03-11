@@ -19,6 +19,7 @@ std::string Scene::GetName() { return name; }
 std::vector<std::shared_ptr<Entity>>& Scene::GetEntities() { return entities; }
 std::vector<std::shared_ptr<Entity>>& Scene::GetOpaqueEntities() { return opaqueEntities; }
 std::vector<Light>& Scene::GetLights() { return lights; }
+std::vector<std::shared_ptr<ShadowLight>>& Scene::GetShadowLights() { return shadowLights; }
 std::vector<std::shared_ptr<Camera>>& Scene::GetCameras() { return cameras; }
 std::shared_ptr<Camera> Scene::GetCurrentCamera() { return currentCamera; }
 std::shared_ptr<Sky> Scene::GetSky() { return sky; }
@@ -47,6 +48,7 @@ void Scene::AddEntity(std::shared_ptr<Entity> entity)
 		octree->AddToPending(entity);
 }
 void Scene::AddLight(Light light) { lights.push_back(light); }
+void Scene::AddShadowLight(Light light) { shadowLights.push_back( std::make_shared<ShadowLight>(light) ); }
 void Scene::AddCamera(std::shared_ptr<Camera> camera) { cameras.push_back(camera); }
 void Scene::AddEmitter(std::shared_ptr<Emitter> emitter) { emitters.push_back(emitter); }
 

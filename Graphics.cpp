@@ -594,26 +594,51 @@ namespace
 		}
 	}
 
+	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(
+		std::vector<std::shared_ptr<Entity>> _entities,
+		std::shared_ptr<Octree::Node> octree,
+		Frustum frustum,
+		DirectX::XMFLOAT4X4 view,
+		DirectX::XMFLOAT4X4 projection,
+		bool frustCull = true);
 	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(std::shared_ptr<Scene> scene);
-	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(std::shared_ptr<Scene> scene)
+	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(std::shared_ptr<Scene> scene) 
+	{ 
+		return GetVisibleEntities(
+			scene->GetEntities(),
+			scene->GetOctree(),
+			scene->GetCurrentCamera()->GetFrustum(),
+			scene->GetCurrentCamera()->GetView(),
+			scene->GetCurrentCamera()->GetProjection()
+			);
+	}
+	std::vector<std::shared_ptr<Entity>> GetVisibleEntities(
+		std::vector<std::shared_ptr<Entity>> _entities,
+		std::shared_ptr<Octree::Node> octree,
+		Frustum frustum,
+		DirectX::XMFLOAT4X4 view,
+		DirectX::XMFLOAT4X4 proj,
+		bool frustCull)
 	{
 		// Get Frustum (points) to check octree with
-		Frustum frustum = scene->GetCurrentCamera()->GetFrustum();
+		//Frustum frustum = scene->GetCurrentCamera()->GetFrustum();
 		DirectX::XMFLOAT3* pointsPtr = frustum.points;
 		std::vector<DirectX::XMFLOAT3> points;
 		points.assign(pointsPtr, pointsPtr + 8);
 
 		// Use Octree to get entities to check collision with
-		Octree::Node* octant = scene->GetOctree()->GetContainingOctant(points);
+		Octree::Node* octant = octree->GetContainingOctant(points);
 		if (!octant)
-			octant = scene->GetOctree().get();
+			octant = octree.get();
 
 		//size_t initialNumEntities = scene->GetEntities().size();
 
 		std::vector<std::shared_ptr<Entity>> entities =
-			octant == nullptr ? scene->GetEntities()
+			octant == nullptr ? _entities
 			: octant->GetRelevantEntities(frustum);
 
+		if (!frustCull)
+			return entities;
 		//size_t octreeEntities = entities.size();
 
 		// Example of frustum culling by creating a frustum out of planes and normals
@@ -694,9 +719,7 @@ namespace
 				*/
 
 			// Frustum culling
-			DirectX::XMFLOAT4X4 proj = scene->GetCurrentCamera()->GetProjection();
 			DirectX::XMMATRIX projMat = DirectX::XMLoadFloat4x4(&proj);
-			DirectX::XMFLOAT4X4 view = scene->GetCurrentCamera()->GetView();
 			DirectX::XMMATRIX viewMat = DirectX::XMLoadFloat4x4(&view);
 			DirectX::XMMATRIX VP = DirectX::XMMatrixMultiply(viewMat, projMat);
 
@@ -753,9 +776,11 @@ namespace
 
 	void RenderShadowMaps(std::vector<std::shared_ptr<ShadowLight>>  shadowLights,
 		std::vector<std::shared_ptr<Entity>> entities,
+		std::shared_ptr<Octree::Node> octree,
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList);
 	void RenderShadowMaps(std::vector<std::shared_ptr<ShadowLight>>  shadowLights,
 		std::vector<std::shared_ptr<Entity>> entities,
+		std::shared_ptr<Octree::Node> octree,
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList)
 	{
 		if (shadowLights.size() == 0)
@@ -823,12 +848,16 @@ namespace
 			cmdList->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
 
 			// Get Relevant entities
-			{
-
-			}
+			std::vector<std::shared_ptr<Entity>> toDraw = GetVisibleEntities(
+				entities,
+				octree,
+				light->GetFrustum(),
+				light->GetView(),
+				light->GetProjection(),
+				false
+			);
 
 			// Sort Entities by mesh
-			std::vector<std::shared_ptr<Entity>> toDraw = entities;
 			std::sort(toDraw.begin(), toDraw.end(), [](const auto& e1, const auto& e2)
 				{
 					// Compare pointers to first mesh
@@ -1264,6 +1293,7 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 	{
 		RenderShadowMaps(scene->GetShadowLights(),
 			scene->GetEntities(),
+			scene->GetOctree(),
 			commandList[0]);
 
 		shadowMapHandle = scene->GetShadowLights()[0]->GetGPUSRVHandle();

@@ -38,6 +38,7 @@ public:
 	DirectX::XMFLOAT3 GetPosition();
 	DirectX::XMFLOAT4X4 GetView();
 	DirectX::XMFLOAT4X4 GetProjection();
+	Frustum GetFrustum();
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetResource();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle();
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetDSVHeap();
@@ -69,6 +70,10 @@ private:
 	DirectX::XMFLOAT4X4 projMatrix;
 	bool dirtyProjection;
 	float fov;
+	Frustum frustum;
+	bool dirtyFrustum;
+	float nearClip;
+	float farClip;
 
 	// Resources
 	//static inline const unsigned int HeapSize = 5;

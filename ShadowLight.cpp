@@ -58,6 +58,12 @@ DirectX::XMFLOAT4X4 ShadowLight::GetProjection()
         UpdateProjectionMatrix();
     return projMatrix;
 }
+Frustum ShadowLight::GetFrustum()
+{
+    if(dirtyFrustum)
+        UpdateFrustum();
+    return frustum;
+}
 Light ShadowLight::GetLight() { return light; }
 int ShadowLight::GetResolution() { return shadowMapResolution; }
 int ShadowLight::GetType() { return light.Type; }
@@ -77,26 +83,31 @@ void ShadowLight::SetLightProjectionSize(float _lightProjectionSize)
 {
     lightProjectionSize = _lightProjectionSize;
     dirtyProjection = true;
+    dirtyFrustum = true;
 }
 void ShadowLight::SetType(int type)
 {
     light.Type = type;
     dirtyProjection = true;
+    dirtyFrustum = true;
 }
 void ShadowLight::SetFov(float _fov)
 {
     fov = _fov;
     dirtyProjection = true;
+    dirtyFrustum = true;
 }
 void ShadowLight::SetDirection(DirectX::XMFLOAT3 _direction)
 {
     light.Direction = _direction;
     dirtyView = true;
+    dirtyFrustum = true;
 }
 void ShadowLight::SetPosition(DirectX::XMFLOAT3 _position)
 {
     light.Position = _position;
     dirtyView = true;
+    dirtyFrustum = true;
 }
 
 void ShadowLight::SetGPUSRVHandle(D3D12_GPU_DESCRIPTOR_HANDLE _gpuSrv) { gpuSrv = _gpuSrv; }
@@ -111,14 +122,22 @@ void ShadowLight::Init()
     // View Projection Matrices
     dirtyProjection = true;
     dirtyView = true;
+    dirtyFrustum = true;
     lightProjectionSize = 30.f;
+
+
+    nearClip = 0.05f;
+    if (light.Type == LIGHT_TYPE_DIRECTIONAL)
+        farClip = 40.f;
+    else
+        farClip = light.Range * 1.1f;
+
     UpdateProjectionMatrix();
     UpdateViewMatrix();
 
     // Buffer Data
     shadowMapResolution = 1024;
     CreateShadowMapData();
-
 }
 
 void ShadowLight::CreateShadowMapData()
@@ -230,7 +249,7 @@ void ShadowLight::UpdateViewMatrix()
     case LIGHT_TYPE_DIRECTIONAL:
         // Only needs to update if direction changes
         DirectX::XMMATRIX lightView = DirectX::XMMatrixLookToLH(
-            DirectX::XMVectorAdd(DirectX::XMVectorScale(lightDirection, -20.0f), // Position: "Backing up" 20 units from desired center
+            DirectX::XMVectorAdd(DirectX::XMVectorScale(lightDirection, farClip * -0.5f), // Position: "Backing up" 20 units from desired center
                 lightPosition), 
             lightDirection, // Direction: light's direction
             DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)); // Up: World up vector (Y axis)
@@ -257,8 +276,8 @@ void ShadowLight::UpdateProjectionMatrix()
         DirectX::XMMATRIX lightProjection = DirectX::XMMatrixOrthographicLH(
             lightProjectionSize,
             lightProjectionSize,
-            0.1f,
-            40.0f);
+            nearClip,
+            farClip);
         XMStoreFloat4x4(&projMatrix, lightProjection);
         break;
     case LIGHT_TYPE_SPOT:
@@ -266,11 +285,126 @@ void ShadowLight::UpdateProjectionMatrix()
         lightProjection = DirectX::XMMatrixPerspectiveFovLH(
             fov,
             1.0f,
-            0.01f,
-            light.Range * 1.1f);
+            nearClip,
+            farClip);
         XMStoreFloat4x4(&projMatrix, lightProjection);
         break;
     }
 
     dirtyProjection = false;
+}
+
+void ShadowLight::UpdateFrustum()
+{
+    // Variables
+    float halfFarLength = light.Type == LIGHT_TYPE_SPOT ? 
+        std::tan(fov * 0.5f) * farClip : 
+        lightProjectionSize / 2;
+    float halfNearLength = light.Type == LIGHT_TYPE_SPOT ?
+        std::tan(fov * 0.5f) * nearClip :
+        halfFarLength;
+
+    DirectX::XMVECTOR fwd = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&light.Direction));
+    DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); // Up: World up vector (Y axis)
+    DirectX::XMVECTOR right = DirectX::XMVector3Cross(up, fwd);
+
+    DirectX::XMVECTOR frontMultFar = DirectX::XMVectorScale(fwd, farClip);
+    DirectX::XMVECTOR rightMultFarLength = DirectX::XMVectorScale(right, halfFarLength);
+    DirectX::XMVECTOR upMultFarLength = DirectX::XMVectorScale(up, halfFarLength);
+
+    DirectX::XMVECTOR frontMultNear = DirectX::XMVectorScale(fwd, nearClip);
+    DirectX::XMVECTOR rightMultNearLength = DirectX::XMVectorScale(right, halfNearLength);
+    DirectX::XMVECTOR upMultNearLength = DirectX::XMVectorScale(up, halfNearLength);
+
+    DirectX::XMVECTOR pos = light.Type == LIGHT_TYPE_SPOT ?
+        DirectX::XMLoadFloat3(&light.Position) :
+        DirectX::XMVectorScale(fwd, farClip * -0.5f);
+    DirectX::XMVECTOR farCenter = DirectX::XMVectorAdd(frontMultFar, pos);
+    DirectX::XMVECTOR nearCenter = DirectX::XMVectorAdd(frontMultFar, pos);
+
+    // Points
+    {
+        DirectX::XMStoreFloat3(&frustum.points[0],		// Top Right Far
+            DirectX::XMVectorAdd(farCenter,
+                DirectX::XMVectorAdd(upMultFarLength, rightMultFarLength)
+            ));
+        DirectX::XMStoreFloat3(&frustum.points[1],		// Bottom Left Far
+            DirectX::XMVectorSubtract(farCenter,
+                DirectX::XMVectorAdd(upMultFarLength, rightMultFarLength)
+            ));
+        DirectX::XMStoreFloat3(&frustum.points[2],		// Top Left Far
+            DirectX::XMVectorAdd(farCenter,
+                DirectX::XMVectorSubtract(upMultFarLength, rightMultFarLength)
+            ));
+        DirectX::XMStoreFloat3(&frustum.points[3],		// Bottom Right Far
+            DirectX::XMVectorSubtract(farCenter,
+                DirectX::XMVectorSubtract(upMultFarLength, rightMultFarLength)
+            ));
+
+
+        DirectX::XMStoreFloat3(&frustum.points[4],		// Top Right Near
+            DirectX::XMVectorAdd(nearCenter,
+                DirectX::XMVectorAdd(upMultNearLength, rightMultNearLength)
+            ));
+        DirectX::XMStoreFloat3(&frustum.points[5],		// Bottom Left Near
+            DirectX::XMVectorSubtract(nearCenter,
+                DirectX::XMVectorAdd(upMultNearLength, rightMultNearLength)
+            ));
+        DirectX::XMStoreFloat3(&frustum.points[6],		// Top Left Near
+            DirectX::XMVectorAdd(nearCenter,
+                DirectX::XMVectorSubtract(upMultNearLength, rightMultNearLength)
+            ));
+        DirectX::XMStoreFloat3(&frustum.points[7],		// Bottom Right Near
+            DirectX::XMVectorSubtract(nearCenter,
+                DirectX::XMVectorSubtract(upMultNearLength, rightMultNearLength)
+            ));
+    }
+
+    // Calculate Normals
+    // https://learnopengl.com/Guest-Articles/2021/Scene/Frustum-Culling
+    {
+        frustum.normals[0] = DirectX::XMFLOAT4(		// Near Face
+            light.Direction.x,
+            light.Direction.y,
+            light.Direction.z,
+            1.0
+        );
+        frustum.normals[0].w = CalcD(frustum.normals[0], frustum.points[4]);
+
+        frustum.normals[1] = DirectX::XMFLOAT4(		// Far Face
+            -light.Direction.x,
+            -light.Direction.y,
+            -light.Direction.z,
+            1.0
+        );
+        frustum.normals[1].w = CalcD(frustum.normals[1], frustum.points[0]);
+
+        DirectX::XMStoreFloat4(&frustum.normals[2],		// Left Face
+            DirectX::XMVector3Cross(
+                up,
+                DirectX::XMVectorAdd(frontMultFar, rightMultFarLength)
+            ));
+        frustum.normals[2].w = CalcD(frustum.normals[2], frustum.points[1]);
+
+        DirectX::XMStoreFloat4(&frustum.normals[3],		// Right Face
+            DirectX::XMVector3Cross(
+                DirectX::XMVectorSubtract(frontMultFar, rightMultFarLength),
+                up
+            ));
+        frustum.normals[3].w = CalcD(frustum.normals[3], frustum.points[0]);
+
+        DirectX::XMStoreFloat4(&frustum.normals[4],		// Bottom Face
+            DirectX::XMVector3Cross(
+                DirectX::XMVectorAdd(frontMultFar, upMultFarLength),
+                right
+            ));
+        frustum.normals[4].w = CalcD(frustum.normals[4], frustum.points[1]);
+
+        DirectX::XMStoreFloat4(&frustum.normals[5],		// Top Face
+            DirectX::XMVector3Cross(
+                right,
+                DirectX::XMVectorSubtract(frontMultFar, upMultFarLength)
+            ));
+        frustum.normals[5].w = CalcD(frustum.normals[5], frustum.points[0]);
+    }
 }

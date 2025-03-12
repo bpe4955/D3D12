@@ -220,6 +220,11 @@ void Game::Update(float deltaTime, float totalTime)
 				}
 			}
 		}
+
+		for (std::shared_ptr<ShadowLight> light : scene->GetShadowLights())
+		{
+			light->SetPosition(scene->GetCurrentCamera()->GetTransform()->GetPosition());
+		}
 	}
 
 	if (Input::KeyPress(VK_TAB))

@@ -236,13 +236,13 @@ void Game::Update(float deltaTime, float totalTime)
 	scene->GetLights()[0].Position = currentCamera->GetTransform()->GetPosition();
 	scene->GetLights()[0].Direction = MouseDirection();
 
-	if (scene->GetShadowLights().size() == 1)
-		scene->AddShadowLight(scene->GetLights()[0]);
-	else
-	{
-		scene->GetShadowLights()[1]->SetPosition(scene->GetLights()[0].Position);
-		scene->GetShadowLights()[1]->SetDirection(scene->GetLights()[0].Direction);
-	}
+	//if (scene->GetShadowLights().size() == 1)
+	//	scene->AddShadowLight(scene->GetLights()[0]);
+	//else
+	//{
+	//	scene->GetShadowLights()[1]->SetPosition(scene->GetLights()[0].Position);
+	//	scene->GetShadowLights()[1]->SetDirection(scene->GetLights()[0].Direction);
+	//}
 
 	// Scene
 	scene->Update(deltaTime, totalTime);

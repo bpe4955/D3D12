@@ -3,6 +3,7 @@
 
 // === VARIABLES & DATA ============================================
 #define MAX_LIGHTS 128
+#define MAX_SHADOWLIGHTS 5  // Must Match Value in ShaderIncludes.hlsli
 
 #define MAX_SPECULAR_EXPONENT 256.0f
 
@@ -31,6 +32,7 @@ cbuffer PerFrame : register(b0)
     int lightCount;
     Light lights[MAX_LIGHTS];
     float4 ambient;
+    Light shadowlights[MAX_SHADOWLIGHTS];
 }
 
 cbuffer PerMaterial : register(b1)
@@ -46,7 +48,11 @@ Texture2D NormalMap : register(t1);
 Texture2D RoughnessMap : register(t2);
 Texture2D MetalMap : register(t3);
 Texture2D OpacityMap : register(t4);
+
+Texture2D ShadowMaps[MAX_SHADOWLIGHTS] : register(t5);
+
 SamplerState Sampler : register(s0);
+SamplerComparisonState ShadowSampler : register(s1);
 
 // PBR Constants:
 // The fresnel value for non-metals (dielectrics)
@@ -232,7 +238,7 @@ float3 SpotLight(float3 worldPosition, Light light, float3 normal, float3 surfac
 
 
 // assuming input values are not normalized
-float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent)
+float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent, float4 shadowMapPos[MAX_SHADOWLIGHTS], int shadowlightCount)
 {
     // Clean up un-normalized normals
     normal = normalize(normal);
@@ -295,6 +301,32 @@ float4 totalLight(float3 normal, float3 worldPosition, float2 uv, float3 tangent
                 break;
             case LIGHT_TYPE_SPOT:
                 totalLight += SpotLight(worldPosition, lights[i], normal, surfaceColor, viewVector, roughness, specularColor, metalness);
+                break;
+        }
+    }
+    // Shadow Light Calculations
+    for (int s = 0; s < shadowlightCount; s++)
+    {
+        // Perform the perspective divide (divide by W) ourselves
+        // Convert the normalized device coordinates to UVs for sampling
+        float2 shadowUV = shadowMapPos[s].xy / shadowMapPos[s].w * 0.5f + 0.5f;
+        shadowUV.y = 1 - shadowUV.y; // Flip the Y
+        // Grab the distances we need: light-to-pixel and closest-surface
+        float distToLight = shadowMapPos[s].z / shadowMapPos[s].w;
+        // Get a ratio of comparison results using SampleCmpLevelZero()
+        float shadowAmount = ShadowMaps[s].SampleCmpLevelZero(ShadowSampler, shadowUV, distToLight).r;
+        
+        //if (shadowAmount > 0.1)
+        switch (shadowlights[i].Type)
+        {
+            case LIGHT_TYPE_DIRECTIONAL:
+                totalLight += DirectionalLight(shadowlights[s], normal, surfaceColor, viewVector, roughness, specularColor, metalness) * shadowAmount;
+                break;
+            case LIGHT_TYPE_POINT:
+                    totalLight += PointLight(worldPosition, shadowlights[s], normal, surfaceColor, viewVector, roughness, specularColor, metalness) * shadowAmount;
+                break;
+            case LIGHT_TYPE_SPOT:
+                    totalLight += SpotLight(worldPosition, shadowlights[s], normal, surfaceColor, viewVector, roughness, specularColor, metalness) * shadowAmount;
                 break;
         }
     }

@@ -5,9 +5,10 @@ cbuffer PerFrame : register(b0)
 {
     matrix view;
     matrix proj;
-
-    //matrix shadowView;
-    //matrix shadowProjection;
+    
+    matrix shadowViews[MAX_SHADOWLIGHTS];
+    matrix shadowProjections[MAX_SHADOWLIGHTS];
+    int shadowlightCount;
 }
 cbuffer PerObject : register(b1)
 {
@@ -29,8 +30,14 @@ VertexToPixel main( VertexShaderInput input )
     output.tangent = mul((float3x3) world, input.tangent);
     
 	// Calculate where this vertex is from the light's point of view
-    //matrix shadowWVP = mul(shadowProjection, mul(shadowView, world));
-    //output.shadowMapPos = mul(shadowWVP, float4(input.localPosition, 1.0f));
+    for (int i = 0; i < shadowlightCount; i++)
+    {
+        matrix shadowWVP = mul(shadowProjections[i], mul(shadowViews[i], world));
+        output.shadowMapPos[i] = mul(shadowWVP, float4(input.localPosition, 1.0f));
+    }
 	
+    output.shadowlightCount = shadowlightCount;
+    
+    
     return output;
 }

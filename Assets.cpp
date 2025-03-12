@@ -732,11 +732,32 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 	srvRange.BaseShaderRegister = baseShaderRegister; // Starts at s0 (match pixel shader!)
 	srvRange.RegisterSpace = 0;
 	srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	// Create an array of SRV's for shadow maps
+	D3D12_DESCRIPTOR_RANGE shadowRange = {};
+	shadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	shadowRange.NumDescriptors = 5; // Set to length of shadow map Texture2D array
+	shadowRange.BaseShaderRegister = baseShaderRegister + numDescriptors; // Starts after other textures
+	shadowRange.RegisterSpace = 0;
+	shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// Create the root parameters
 	int numRootParams = 5;
+	bool hasShadows = false;
+	if (d.contains("hasShadowMaps") && d["hasShadowMaps"].is_string())
+	{
+		auto input = d["hasShadowMaps"].get<std::string>();
+		std::transform(input.begin(), input.end(), input.begin(),
+			[](unsigned char c) { return std::toupper(c); });
+
+		if (input == "TRUE" || input == "1") 
+		{ 
+			numRootParams++;
+			hasShadows = true; 
+		}
+
+	}
 	if (path.find(L"Particle") != std::wstring::npos)
-		numRootParams = 6;
+		numRootParams++;
 	D3D12_ROOT_PARAMETER* rootParams = new D3D12_ROOT_PARAMETER[numRootParams];
 	// CBV table param for vertex shader
 	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -761,13 +782,22 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 	rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParams[4].DescriptorTable.NumDescriptorRanges = 1;
 	rootParams[4].DescriptorTable.pDescriptorRanges = &srvRange;
+	// Shadow Maps
+	if (hasShadows)
+	{
+		rootParams[numRootParams - 1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[numRootParams - 1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		rootParams[numRootParams - 1].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[numRootParams - 1].DescriptorTable.pDescriptorRanges = &shadowRange;
+	}
+	
 	// SRV table param for Particle VS
 	if (path.find(L"Particle") != std::wstring::npos)
 	{
-		rootParams[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		rootParams[5].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[5].DescriptorTable.pDescriptorRanges = &srvRange;
+		rootParams[numRootParams - 1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[numRootParams - 1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		rootParams[numRootParams - 1].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[numRootParams - 1].DescriptorTable.pDescriptorRanges = &srvRange;
 	}
 
 	// Create a single static sampler (available to all pixel shaders at the same slot)
@@ -871,13 +901,31 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 	sampDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	sampDesc.ComparisonFunc = compFunc;
 
-	D3D12_STATIC_SAMPLER_DESC samplers[] = { sampDesc };
+	D3D12_STATIC_SAMPLER_DESC shadowSampDesc = {};
+	shadowSampDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+	shadowSampDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+	shadowSampDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+	shadowSampDesc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+	shadowSampDesc.MaxAnisotropy = 16;
+	shadowSampDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+	shadowSampDesc.MaxLOD = D3D12_FLOAT32_MAX;
+	shadowSampDesc.ShaderRegister = 1; // register(s1)
+	shadowSampDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	shadowSampDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS;
+
+	int numStaticSamplers = 1;
+	if (hasShadows)
+		numStaticSamplers++;
+	D3D12_STATIC_SAMPLER_DESC* samplers = new D3D12_STATIC_SAMPLER_DESC[numStaticSamplers];
+	samplers[0] = sampDesc;
+	if (hasShadows)
+		samplers[1] = shadowSampDesc;
 	// Describe the root signature
 	D3D12_ROOT_SIGNATURE_DESC rootSig = {};
 	rootSig.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	rootSig.NumParameters = numRootParams;
 	rootSig.pParameters = rootParams;
-	rootSig.NumStaticSamplers = ARRAYSIZE(samplers);
+	rootSig.NumStaticSamplers = numStaticSamplers;
 	rootSig.pStaticSamplers = samplers;
 
 	// Serialze the root signature
@@ -902,11 +950,14 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> Assets::LoadRootSig(std::wstring pat
 		serializedRootSig->GetBufferPointer(),
 		serializedRootSig->GetBufferSize(),
 		IID_PPV_ARGS(rootSignature.GetAddressOf()));
+	
+	assert(rootSignature);
 
 	rootSigs.insert({ filename, rootSignature });
 
 
 	delete[] rootParams;
+	delete[] samplers;
 	return rootSignature;
 }
 Microsoft::WRL::ComPtr<ID3D12PipelineState> Assets::LoadPipelineState(std::wstring path)
@@ -1587,7 +1638,7 @@ std::shared_ptr<Scene> Assets::LoadScene(std::wstring path)
 	std::vector skyLights = scene->GetSky()->GetLights();
 	for (int i = 0; i < skyLights.size(); i++) 
 		{ 
-			scene->AddLight(skyLights[i]); 
+			//scene->AddLight(skyLights[i]); 
 			scene->AddShadowLight(skyLights[i]);
 		}
 

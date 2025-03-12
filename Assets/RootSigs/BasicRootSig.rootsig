@@ -1,5 +1,6 @@
 {
     "numTextures": 5,
+    "hasShadowMaps": "TRUE",
     "baseShaderRegister": 0,
     "sampler": 
     {

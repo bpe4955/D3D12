@@ -58,6 +58,7 @@ DirectX::XMFLOAT4X4 ShadowLight::GetProjection()
         UpdateProjectionMatrix();
     return projMatrix;
 }
+Light ShadowLight::GetLight() { return light; }
 int ShadowLight::GetResolution() { return shadowMapResolution; }
 int ShadowLight::GetType() { return light.Type; }
 DirectX::XMFLOAT3 ShadowLight::GetDirection() { return light.Direction; }
@@ -110,7 +111,7 @@ void ShadowLight::Init()
     // View Projection Matrices
     dirtyProjection = true;
     dirtyView = true;
-    lightProjectionSize = 15.f;
+    lightProjectionSize = 30.f;
     UpdateProjectionMatrix();
     UpdateViewMatrix();
 

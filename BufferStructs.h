@@ -3,6 +3,7 @@
 
 // Must match the MAX_LIGHTS definition in your shaders
 #define MAX_LIGHTS 128
+#define MAX_SHADOWLIGHTS 5
 
 // These should also match lights in shaders
 #define LIGHT_TYPE_DIRECTIONAL	0
@@ -33,6 +34,12 @@ struct VSPerFrameData
 {
 	DirectX::XMFLOAT4X4 view;
 	DirectX::XMFLOAT4X4 projection;
+
+	DirectX::XMFLOAT4X4 shadowViews[MAX_SHADOWLIGHTS];
+	DirectX::XMFLOAT4X4 shadowProjections[MAX_SHADOWLIGHTS];
+
+	int shadowlightCount;
+	DirectX::XMFLOAT3 padding;
 };
 
 struct VSPerObjectData
@@ -60,6 +67,7 @@ struct PSPerFrameData
 	int lightCount;
 	Light lights[MAX_LIGHTS];
 	DirectX::XMFLOAT4 ambient;
+	Light shadowlights[MAX_SHADOWLIGHTS];
 };
 
 struct PSPerMaterialData

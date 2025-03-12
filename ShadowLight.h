@@ -31,6 +31,7 @@ public:
 	// Getters
 	//Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetShadowSRV();
 	//Microsoft::WRL::ComPtr<ID3D11DepthStencilView> GetShadowDSV();
+	Light GetLight();
 	int GetResolution();
 	int GetType();
 	DirectX::XMFLOAT3 GetDirection();

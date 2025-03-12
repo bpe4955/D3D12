@@ -891,7 +891,7 @@ namespace
 				cmdList->ResourceBarrier(1, &rb);
 			}
 
-			// Send to GPU
+			// Send to GPU (All Shadow Maps will be contiguous)
 			D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle =
 				d3d12Helper.CopySRVsToDescriptorHeapAndGetGPUDescriptorHandle(light->GetCPUSRVHandle(), 1,
 					light->GetSRVDescriptorOffset());
@@ -933,11 +933,13 @@ namespace
 	void DrawEntities(std::vector<std::shared_ptr<Entity>> entities,
 		D3D12_GPU_DESCRIPTOR_HANDLE vsPerFramehandle,
 		D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle,
+		D3D12_GPU_DESCRIPTOR_HANDLE shadowHandle,
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList,
 		Visibility desiredVisibility = Visibility::Opaque);
 	void DrawEntities(std::vector<std::shared_ptr<Entity>> entities,
 		D3D12_GPU_DESCRIPTOR_HANDLE vsPerFramehandle,
 		D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle,
+		D3D12_GPU_DESCRIPTOR_HANDLE shadowHandle,
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList,
 		Visibility desiredVisibility)
 	{
@@ -987,6 +989,8 @@ namespace
 							// Input Per Frame Data
 							cmdList->SetGraphicsRootDescriptorTable(0, vsPerFramehandle);
 							cmdList->SetGraphicsRootDescriptorTable(2, psPerFrameHandle);
+							if(shadowHandle.ptr)
+								cmdList->SetGraphicsRootDescriptorTable(5, shadowHandle);
 						}
 						cmdList->IASetPrimitiveTopology(currentMaterial->GetTopology());
 
@@ -1223,6 +1227,18 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 	VSPerFrameData vsPerFrameData = {};
 	vsPerFrameData.view = scene->GetCurrentCamera()->GetView();
 	vsPerFrameData.projection = scene->GetCurrentCamera()->GetProjection();
+
+	int shadowLightCount = (int)scene->GetShadowLights().size();
+	vsPerFrameData.shadowlightCount = shadowLightCount;
+	std::vector<std::shared_ptr<ShadowLight>> shadowLights = scene->GetShadowLights();
+	for (int i = 0; i < shadowLightCount; i++)
+	{
+		std::shared_ptr<ShadowLight> shadowLight = shadowLights[i];
+		vsPerFrameData.shadowViews[i] = shadowLight->GetView();
+		vsPerFrameData.shadowProjections[i] = shadowLight->GetProjection();
+	}
+
+
 	D3D12_GPU_DESCRIPTOR_HANDLE vsPerFramehandle =
 		d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle((void*)(&vsPerFrameData), sizeof(VSPerFrameData));
 	// -- PS
@@ -1233,13 +1249,26 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 	const float ambMult = 0.05f;
 	psPerFrameData.ambient = DirectX::XMFLOAT4(ambientColor.x * ambMult, ambientColor.y * ambMult, ambientColor.z * ambMult, 1);
 	memcpy(psPerFrameData.lights, &scene->GetLights()[0], sizeof(Light) * MAX_LIGHTS);
+
+	for (int i = 0; i < shadowLightCount; i++)
+	{
+		psPerFrameData.shadowlights[i] = shadowLights[i]->GetLight();
+	}
+
 	D3D12_GPU_DESCRIPTOR_HANDLE psPerFrameHandle = d3d12Helper.FillNextConstantBufferAndGetGPUDescriptorHandle(
 		(void*)(&psPerFrameData), sizeof(PSPerFrameData));
 
 
-	RenderShadowMaps(scene->GetShadowLights(),
-		scene->GetEntities(),
-		commandList[0]);
+	D3D12_GPU_DESCRIPTOR_HANDLE shadowMapHandle = {};
+	if (scene->GetShadowLights().size() != 0)
+	{
+		RenderShadowMaps(scene->GetShadowLights(),
+			scene->GetEntities(),
+			commandList[0]);
+
+		shadowMapHandle = scene->GetShadowLights()[0]->GetGPUSRVHandle();
+	}
+
 
 	// Render Opaque Entities
 	// Sort Entities by material
@@ -1248,7 +1277,7 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 			// Compare pointers to materials
 			return e1->GetMaterials()[0]->GetPipelineState() < e2->GetMaterials()[0]->GetPipelineState();
 		});
-	DrawEntities(opaqueEntities, vsPerFramehandle, psPerFrameHandle,
+	DrawEntities(opaqueEntities, vsPerFramehandle, psPerFrameHandle, shadowMapHandle,
 		commandList[1], Visibility::Opaque);
 
 
@@ -1323,7 +1352,7 @@ void Graphics::RenderOptimized(std::shared_ptr<Scene> scene, unsigned int active
 						DirectX::XMLoadFloat3(&bPos), DirectX::XMLoadFloat3(&camPos))));
 			return aDist > bDist;
 		});
-	DrawEntities(transparentEntities, vsPerFramehandle, psPerFrameHandle,
+	DrawEntities(transparentEntities, vsPerFramehandle, psPerFrameHandle, shadowMapHandle,
 		commandList[2], Visibility::Transparent);
 
 	//// Render Particles
